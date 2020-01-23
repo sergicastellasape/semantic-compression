@@ -1,3 +1,12 @@
+# exclude everything inside this folders
+assets/*
+
+# exception .gitkeep file
+!assets/.gitkeep
+
+
+
+
 .DS_Store
 .huskyrc.json
 out
@@ -10,6 +19,8 @@ log.log
 *.noseids
 .nyc_output
 .vscode-test
+.vscode
+.ipynb_checkpoints/
 __pycache__
 npm-debug.log
 **/.mypy_cache/**
