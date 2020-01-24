@@ -21,6 +21,7 @@ log.log
 .vscode-test
 .vscode
 .ipynb_checkpoints/
+.idea/
 __pycache__
 npm-debug.log
 **/.mypy_cache/**
