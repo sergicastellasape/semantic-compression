@@ -3,12 +3,13 @@ The idea is to have a class that inicializes the representation generation mecha
 Then, a forward pass gives a tensor (or batch of tensors) and the corresponding list of indices
 and performs the generation.
 """
-
+import torch
 import torch.nn as nn
 from model.utils import abs_max_pooling
 
+
 class EmbeddingGenerator():
-    def __init__(self, pool_function=None, device=torch.device('cpu')):
+    def __init__(self, pool_function=abs_max_pooling, device=torch.device('cpu')):
         try:
             t = torch.rand((16, 50, 200))
             _ = pool_function(t)
@@ -16,12 +17,10 @@ class EmbeddingGenerator():
             self.device = device
         except:
             raise ValueError("The pool_function seems to not work!")
-        
 
     def forward(self, input_tensors, indices):
         compact_representation = self.generate(input_tensors, indices)
         return compact_representation
-
 
     def generate(self, tensors_batch, indices_batch):
         # tensors_batch.shape() = batch, seq_length, embedding_size
@@ -43,7 +42,6 @@ class EmbeddingGenerator():
 
         return compact_tensors_batch, mask
 
-
     def initialize_padding_tensor_like(self, tensor):
         # this function should be better, like initialize randomly from a distribution, because
         # the elements that are not overwritten by the originial tensors or pooling from them
@@ -52,3 +50,9 @@ class EmbeddingGenerator():
         return init_tensor
 
 
+class IdentityGenerator(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(IdentityGenerator, self).__init__()
+
+    def forward(self, x, *args, **kwargs):
+        return x

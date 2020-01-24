@@ -5,12 +5,12 @@ import torch
 class End2EndModel(nn.Module):
     def __init__(self, 
                  transformer, 
-                 bracketing, 
+                 bracketer, 
                  generator, 
                  multitasknet, 
-                 trainable_modules = ['multitasknet', 'generator']
+                 trainable_modules = ['multitasknet', 'generator'],
                  device = torch.device('cpu')):
-        super(PlaceholderName, self).__init__()
+        super().__init__()
 
         self.device = device
         self.transformer = transformer
@@ -18,13 +18,15 @@ class End2EndModel(nn.Module):
         self.generator = generator
         self.multitasknet = multitasknet
 
+        self.trainable_modules = trainable_modules
+
     
 
     def forward(self, sequences_batch):
-        context_representation = self.transformer.forward(input)
+        context_representation = self.transformer.forward(sequences_batch)
         indices = self.bracketer.forward(context_representation)
         compact_representation = self.generator.forward(context_representation, indices)
-        output = self.multitasknet(compact_representation)
+        output = self.multitasknet.forward(compact_representation)
         return output
 
 
@@ -36,17 +38,16 @@ class MultiTaskNet(nn.Module):
         super(MultiTaskNet, self).__init__()
 
         self.device = device
-        self.parallel_net_list = [task_networks]
+        self.parallel_net_tuple = task_networks
+        self.config = config
 
-
-    def forward(self, input):
+    def forward(self, inp):
         output = []
         # eventually this could be parallelized because there's no sequential
         # dependency, but that introduces much complexity in the implementation
-        for task_net in self.parallel_net_list:
-            output.append(task_net.forward(input))
+        for task_net in self.parallel_net_tuple:
+            output.append(task_net.forward(inp))
         return output
-
 
     def loss(self, predictions, targets, weights=None):
         losses = []
@@ -54,10 +55,11 @@ class MultiTaskNet(nn.Module):
             losses.append(network.loss(prediction, target))
         
         loss = torch.tensor(losses, device=self.device, requires_grad=True)
-        if scaling == None:
+        if weights == None:
             multi_task_loss = torch.mean(loss)
         else:
             weights = torch.tensor(weights, device=self.device)
             multi_task_loss = torch.sum(loss * weights)
 
         return multi_task_loss
+

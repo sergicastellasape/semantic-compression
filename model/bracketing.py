@@ -1,40 +1,42 @@
-from typing import List
 import itertools
-import torch
+from typing import List
 import re
-import numpy as np
 
-cos = torch.nn.CosineSimilarity(dim=1, eps=1e-5) # default similarity func.
+import torch
+import torch.nn as nn
+
+cos = torch.nn.CosineSimilarity(dim=-1, eps=1e-5)  # default similarity func.
+
 
 class NNSimilarityChunker(nn.Module):
     def __init__(self,
-                 sim_function=cos,  
-                 exclude_special_tokens=True, 
-                 combinatorics='sequential')
+                 sim_function=cos,
+                 threshold=0.9,
+                 exclude_special_tokens=True,
+                 combinatorics='sequential'):
+        super().__init__()
 
         self.sim_function = sim_function
         self.exclude_special_tokens = exclude_special_tokens
-
+        self.threshold = threshold
         assert combinatorics in ['sequential', 'all']
         self.combinatorics = combinatorics
-
 
     def forward(self, batch_sequence_tensors: torch.Tensor, threshold=0.9) -> List[List[List]]:
         indices_to_compact = self.indices_to_compact_by_similarity_threshold(batch_sequence_tensors)
         return indices_to_compact
 
-
     def indices_to_compact_by_similarity_threshold(self, batch_sequence_tensors) -> List[List]:
                 
-        batch_size, seq_length, embedding_size = batch_sequence_tensors.size() # make sure the input is proper size!!
+        batch_size, seq_length, embedding_size = batch_sequence_tensors.size()  # make sure the input is proper size!!
         indices = list(range(seq_length))    
         
         # Combinations of indices that are group candidates: only sequential (indices[s:e])
         if self.combinatorics == 'sequential':
             if self.exclude_special_tokens:
-                idx_combinations = [indices[s:e] for s, e in itertools.combinations(range(1, len(indices)), 2)]
+                idx_combinations = [indices[s:e+1] for s, e in itertools.combinations(range(1, len(indices)), 2)]
             else:
-                idx_combinations = [indices[s:e] for s, e in itertools.combinations(range(len(indices)+1), 2)]
+                idx_combinations = [indices[s:e+1] for s, e in itertools.combinations(range(len(indices)+1), 2)]
         
         # All permutations (extremely time sensitive)
         elif self.combinatorics == 'all':
@@ -42,25 +44,33 @@ class NNSimilarityChunker(nn.Module):
             for L in range(2, seq_length+1):
                 combinations = list(itertools.combinations(indices, r=L))
                 idx_combinations.extend(combinations)
-        
+
         # Initialize empty list of lists of length batch_size
-        batch_all_indices_to_compact = [[None]] * batch_size
+        batch_all_indices_to_compact = [[] for _ in range(batch_size)]
+
         for indices in idx_combinations:
-            group_size = len(indices)
             batch_group_candidates = batch_sequence_tensors[:, indices, :]
-            batch_centers = torch.mean(batch_group_candidates, dim=1).repeat(1, group_size, 1)
+            batch_centers = torch.mean(batch_group_candidates, dim=1).unsqueeze(1)
             # Calculate all embeddings similarities w.r.t. the center of the group
-            similarities = self.sim_function(batch_centers, batch_group_candidates, dim=-1)
+            similarities = self.sim_function(batch_centers, batch_group_candidates)
             worst_sim, _ = torch.min(similarities, dim=-1)
-            batch_include_group_mask = worst_sim >= self.threshold # this is a torch.bool tensor of size (batch,)
-            
+            # Construct torch.bool tensor of size (batch,) as a 'mask'
+            batch_include_group_mask = worst_sim >= self.threshold
+            # Iterate over mask and fill the List of indices to compact
             for b, include_group in enumerate(batch_include_group_mask):
                 if include_group: batch_all_indices_to_compact[b].append(indices)
-                
-        batch_indices_to_compact = batch_remove_subsets(all_indices_to_compact)
+
+        batch_indices_to_compact = batch_remove_subsets(batch_all_indices_to_compact)
         
         return batch_indices_to_compact
 
+
+class IdentityChunker(nn.Module):
+    def __init__(self, *args, **kargs):
+        super(IdentityChunker, self).__init__()
+
+    def forward(self, x, *args, **kwargs):
+        return [[None]]*x.size(0)  #return empty list of lists of batch size
 
 
 def batch_remove_subsets(batch_L):
@@ -77,7 +87,7 @@ def batch_remove_subsets(batch_L):
 
 ############################## DEPRECATED ####################################
 # This class was used in other experiments but it won't work here
-class Chunker():
+"""class Chunker():
     def __init__(self, 
                  layer=-1, 
                  sim_function=cos, 
@@ -187,8 +197,7 @@ class Chunker():
     def remove_subsets(L):
         filtered = filter(lambda f: not any(set(f) < set(g) for g in L), L)
         return list(filtered)
-    
+    """
     
 
 
-    

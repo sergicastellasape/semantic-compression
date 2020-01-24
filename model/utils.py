@@ -1,10 +1,10 @@
 """
 Collection of useful little functions.
 """
-import torch
-from torch.nn.utils.rnn import pack_padded_sequence, PackedSequence
 import re
 import time
+import torch
+from torch.nn.utils.rnn import PackedSequence
 
 
 # THIS FOR IMDB DATASET
@@ -93,13 +93,13 @@ def txt2list(txt_path=None):
 
 
 def abs_max_pooling(T, dim=1):
-        # input is (batch, seq_length, emb_dimension)
-        _, abs_max_i = torch.max(T.abs(), dim=dim) #max over abs in sequence dimension
-        # convert indices into one_hot vectors
-        one_hot = torch.nn.functional.one_hot(abs_max_i, num_classes=T.size()[dim]).transpose(dim, -1).type(torch.float)
-        # multily original with one hot to apply mask and then sum over the dimension
-        max_abs_tensor = torch.mul(T, one_hot).sum(dim=dim)
-        return max_abs_tensor
+    # input is (batch, seq_length, emb_dimension)
+    _, abs_max_i = torch.max(T.abs(), dim=dim) #max over abs in sequence dimension
+    # convert indices into one_hot vectors
+    one_hot = torch.nn.functional.one_hot(abs_max_i, num_classes=T.size()[dim]).transpose(dim, -1).type(torch.float)
+    # multily original with one hot to apply mask and then sum over the dimension
+    max_abs_tensor = torch.mul(T, one_hot).sum(dim=dim)
+    return max_abs_tensor
 
 #torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
