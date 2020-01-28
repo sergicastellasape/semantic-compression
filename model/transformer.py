@@ -30,7 +30,7 @@ class Transformer(nn.Module):
 
 
     def batch_encode(self, batch_sequences):                             
-        encoded_inputs_dict = self.tokenizer.batch_encode_plus(batch_text_or_text_pairs=batch_sequences, 
+        encoded_inputs_dict = self.tokenizer.batch_encode_plus(batch_text_or_text_pairs=batch_sequences,
                                                                add_special_tokens=True,
                                                                return_special_tokens_mask=True,
                                                                return_token_type_ids=True)

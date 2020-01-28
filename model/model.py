@@ -28,11 +28,12 @@ class End2EndModel(nn.Module):
 
         self.trainable_modules = trainable_modules
      
-    def forward(self, sequences_batch):
+    def forward(self, sequences_batch, batch_splits=None):
+        assert batch_splits != None
         context_representation, masks_dict = self.transformer.forward(sequences_batch, return_masks=True)
         indices = self.bracketer.forward(context_representation)
         compact_representation = self.generator.forward(context_representation, indices)
-        output = self.multitasknet.forward(compact_representation)
+        output = self.multitasknet.forward(compact_representation, batch_splits=batch_splits)
         return output
 
     def loss(self, batch_prediction, batch_targets, weights=None):
@@ -50,16 +51,20 @@ class MultiTaskNet(nn.Module):
         super(MultiTaskNet, self).__init__()
 
         self.device = device
-        self.parallel_net_tuple = task_networks
+        self.parallel_net_list = nn.ModuleList(task_networks)
         self.config = config
+        for network in task_networks:
+            self.parameters
 
 
-    def forward(self, inp):
+    def forward(self, inp, batch_splits=None):
+        assert batch_splits != None
         output = []
         # eventually this could be parallelized because there's no sequential
         # dependency, but that introduces much complexity in the implementation
-        for task_net in self.parallel_net_tuple:
-            output.append(task_net.forward(inp))
+        for i, task_net in enumerate(self.parallel_net_list):
+            inp_split = inp[batch_splits[i]:batch_splits[i+1], :, :]
+            output.append(task_net.forward(inp_split))
         return output
 
 

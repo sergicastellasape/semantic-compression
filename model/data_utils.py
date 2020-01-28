@@ -13,10 +13,20 @@ def get_batch_QQP_from_indices(dataframe, batch_indices):
 
     batch_question_pair_label = []
     for i in range(len(batch_indices)):
-        batch_question_pair_label.append((q1[i], q2[i], is_duplicate[i]))
+        batch_question_pair_label.append(((q1[i], q2[i]), is_duplicate[i]))
             
     return batch_question_pair_label
 
+
+def get_batch_SST2_from_indices(dataframe, batch_indices):
+
+    reviews = dataframe.iloc[batch_indices]['review'].tolist()
+    sentiments = dataframe.iloc[batch_indices]['sentiment'].tolist()
+    batch_review_sentiment = []
+    for i in range(len(batch_indices)):
+        batch_review_sentiment.append((reviews[i], sentiments[i]))
+
+    return batch_review_sentiment
 
 # THIS FOR IMDB DATASET: returns a list of
 def sentiment2tensorIMDB(sent_list):

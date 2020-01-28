@@ -179,7 +179,7 @@ class SeqPairAttentionClassifier(nn.Module):
         self.attention_vecs2 = nn.Parameter(init_normal2.clone().detach().requires_grad_(True).to(device))
 
 
-    def forward(self, input_tup):
+    def forward(self, input, mask_dict=None):
         """
         Input_tup should be a tuple of two tensors, containing the batches 
         """
