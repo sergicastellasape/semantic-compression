@@ -1,7 +1,6 @@
 import itertools
 from typing import List
 import re
-
 import torch
 import torch.nn as nn
 
@@ -66,6 +65,9 @@ class NNSimilarityChunker(nn.Module):
 
 
 class IdentityChunker(nn.Module):
+    """
+    IdentityChunker docstring
+    """
     def __init__(self, *args, **kargs):
         super(IdentityChunker, self).__init__()
 

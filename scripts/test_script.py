@@ -1,4 +1,4 @@
-# Add parent directory to sys path to be able to import from the root dir
+# Add parent directory to sys path to be able to import modules from the root dir
 import sys
 sys.path.append('.')
 
@@ -42,5 +42,8 @@ end2end_model = End2EndModel(transformer=transformer_net,
                              device=device)
 
 batch_sequence = ['this is one sentence', 'this is a second sentence', 'this is a third sentnen.']
-end2end_model.forward(batch_sequence)
+
+optimizer = torch.optim.Adam(end2end_model.parameters())
+output = end2end_model.forward(batch_sequence)
+print(output.size())
 raise ValueError("Whoha it workeddd!!!")

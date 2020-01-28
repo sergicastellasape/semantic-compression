@@ -7,25 +7,6 @@ import torch
 from torch.nn.utils.rnn import PackedSequence
 
 
-# THIS FOR IMDB DATASET
-def sentiment2tensorIMDB(sent_list):
-    logits = []
-    for sent in sent_list:
-        if sent == 'positive':
-            logits.append(1)
-        elif sent == 'negative':
-            logits.append(0)
-        else:
-            raise ValueError("A sentiment wasn't positive or negative!")
-    return torch.tensor(logits)
-
-
-# For SST2 the sentiment column is already numbers so no 
-# need to do fancy stuff, just to tensor
-def sentiment2tensorSST(sent_list):
-    return torch.tensor(sent_list)
-
-
 def add_space_to_special_characters(string, characters=[]):
     for char in characters:
         string = string.replace(char, f' {char} ')

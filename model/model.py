@@ -1,8 +1,16 @@
+"""
+Main wrappers that implement the rest of the parts of the model: the initial common pipeline
+sequentially (transformer + bracketer + generator) plus the multitask networks that
+operate "in parallel"
+"""
 import torch.nn as nn
 import torch
 
 
 class End2EndModel(nn.Module):
+    """
+    End2EndModel docstring
+    """
     def __init__(self, 
                  transformer, 
                  bracketer, 
@@ -19,18 +27,22 @@ class End2EndModel(nn.Module):
         self.multitasknet = multitasknet
 
         self.trainable_modules = trainable_modules
-
-    
-
+     
     def forward(self, sequences_batch):
-        context_representation = self.transformer.forward(sequences_batch)
+        context_representation, masks_dict = self.transformer.forward(sequences_batch, return_masks=True)
         indices = self.bracketer.forward(context_representation)
         compact_representation = self.generator.forward(context_representation, indices)
         output = self.multitasknet.forward(compact_representation)
         return output
 
+    def loss(self, batch_prediction, batch_targets, weights=None):
+        return self.multitasknet.loss(batch_prediction, batch_targets, weights=weights)
+
 
 class MultiTaskNet(nn.Module):
+    """
+    MultiTaskNet docstring
+    """
     def __init__(self,
                  *task_networks,
                  device=torch.device('cpu'),
@@ -41,6 +53,7 @@ class MultiTaskNet(nn.Module):
         self.parallel_net_tuple = task_networks
         self.config = config
 
+
     def forward(self, inp):
         output = []
         # eventually this could be parallelized because there's no sequential
@@ -48,6 +61,7 @@ class MultiTaskNet(nn.Module):
         for task_net in self.parallel_net_tuple:
             output.append(task_net.forward(inp))
         return output
+
 
     def loss(self, predictions, targets, weights=None):
         losses = []

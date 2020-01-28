@@ -17,27 +17,63 @@ class Transformer(nn.Module):
         self.tokenizer = tokenizer_class.from_pretrained(pre_trained_weights)
 
 
-    def forward(self, sequences_batch, output_layer=-1):
-        input_tensor = self.batch_encode(sequences_batch)
+    def forward(self, batch_sequences, output_layer=-1, return_masks=False):
+        batch_input_ids, masks_dict = self.batch_encode(batch_sequences)
 
-        # hidden_states_tup[i].size() = (batch, layers, embedding_dim)
-        hidden_states_tup = self.model(input_tensor)[-1]
+        hidden_states_tup = self.model(batch_input_ids, 
+                                       attention_mask=masks_dict['padding_mask'])[-1]
         
-        return hidden_states_tup[output_layer].detach()
+        if return_masks:
+            return hidden_states_tup[output_layer].detach(), masks_dict
+        else:
+            return hidden_states_tup[output_layer].detach()
 
 
-    def batch_encode(self, sequences_batch):
-
-        encoded_inputs_dict = self.tokenizer.batch_encode_plus(batch_text_or_text_pairs=sequences_batch)
+    def batch_encode(self, batch_sequences):                             
+        encoded_inputs_dict = self.tokenizer.batch_encode_plus(batch_text_or_text_pairs=batch_sequences, 
+                                                               add_special_tokens=True,
+                                                               return_special_tokens_mask=True,
+                                                               return_token_type_ids=True)
+        
         batch_input_ids = encoded_inputs_dict['input_ids']
-        max_length = max([len(seq) for seq in batch_input_ids]) + 2 # get maximum sequence length for padding, the +2 is to account for the [CLS] and [SEP] tokens added
-        padded_batch_input_ids = []
+        
+        # get maximum sequence length for padding, the +3 is to account for the [CLS] and [SEP] tokens added
+        max_length = max([len(seq) for seq in batch_input_ids])
+        
+        batch_padded_token_type_ids = [L + [-1]*(max_length - len(L)) for L 
+                                       in encoded_inputs_dict['token_type_ids']]
+        
+        padded_batch_input_ids, batch_regular_tokens_mask, batch_padding_mask = [], [], []
         for input_ids in batch_input_ids:
-            padded_input_dict = self.tokenizer.prepare_for_model(input_ids, max_length=max_length, pad_to_max_length=True)
+            padded_input_dict = self.tokenizer.prepare_for_model(input_ids,
+                                                                 max_length=max_length, 
+                                                                 pad_to_max_length=True,
+                                                                 truncation_strategy='do_not_truncate',
+                                                                 add_special_tokens=False,
+                                                                 return_special_tokens_mask=True,
+                                                                 return_attention_mask=True,
+                                                                 return_token_type_ids=True)
+
+            # Construct mask that's 0s for <cls>, <sep> and <pad> tokens and 1s for the rest
+            padding_mask = padded_input_dict['attention_mask']
+            special_tokens_mask = self.tokenizer.get_special_tokens_mask(padded_input_dict['input_ids'],
+                                                                         already_has_special_tokens=True)
+            inverse_special_tokens_mask = [m-1 for m in special_tokens_mask]
+            regular_tokens_mask = [m1*m2 for m1, m2
+                                   in zip(inverse_special_tokens_mask, padding_mask)]
+            
             padded_batch_input_ids.append(padded_input_dict['input_ids'])
+            batch_regular_tokens_mask.append(regular_tokens_mask)
+            batch_padding_mask.append(padding_mask)
+            
         input_tensor = torch.tensor(padded_batch_input_ids).to(self.device)
-
-        return input_tensor
-
-
+        regular_tokens_mask_tensor = torch.tensor(batch_regular_tokens_mask).to(self.device)
+        padding_mask_tensor = torch.tensor(batch_padding_mask).to(self.device)
+        seq_pair_mask_tensor = torch.tensor(batch_padded_token_type_ids).to(self.device)
+        
+        masks_dict = {'regular_tokens_mask' : regular_tokens_mask_tensor,
+                      'padding_mask'        : padding_mask_tensor,
+                      'seq_pair_mask'       : seq_pair_mask_tensor}
+        
+        return input_tensor, masks_dict
         
