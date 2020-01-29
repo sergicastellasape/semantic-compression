@@ -40,6 +40,7 @@ class Transformer(nn.Module):
         # get maximum sequence length for padding, the +3 is to account for the [CLS] and [SEP] tokens added
         max_length = max([len(seq) for seq in batch_input_ids])
         
+        # add -1 to identify the padding part
         batch_padded_token_type_ids = [L + [-1]*(max_length - len(L)) for L 
                                        in encoded_inputs_dict['token_type_ids']]
         
@@ -66,10 +67,10 @@ class Transformer(nn.Module):
             batch_regular_tokens_mask.append(regular_tokens_mask)
             batch_padding_mask.append(padding_mask)
             
-        input_tensor = torch.tensor(padded_batch_input_ids).to(self.device)
-        regular_tokens_mask_tensor = torch.tensor(batch_regular_tokens_mask).to(self.device)
-        padding_mask_tensor = torch.tensor(batch_padding_mask).to(self.device)
-        seq_pair_mask_tensor = torch.tensor(batch_padded_token_type_ids).to(self.device)
+        input_tensor = torch.tensor(padded_batch_input_ids, device=self.device)
+        regular_tokens_mask_tensor = torch.tensor(batch_regular_tokens_mask, device=self.device)
+        padding_mask_tensor = torch.tensor(batch_padding_mask, device=self.device)
+        seq_pair_mask_tensor = torch.tensor(batch_padded_token_type_ids, device=self.device)
         
         masks_dict = {'regular_tokens_mask' : regular_tokens_mask_tensor,
                       'padding_mask'        : padding_mask_tensor,

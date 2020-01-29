@@ -18,19 +18,20 @@ class EmbeddingGenerator():
         except:
             raise ValueError("The pool_function seems to not work!")
 
-    def forward(self, input_tensors, indices):
-        compact_representation = self.generate(input_tensors, indices)
-        return compact_representation
+    def forward(self, input_tensors, indices, mask_dict=mask_dict):
+        compact_representation, mask = self.generate(input_tensors, indices, mask_dict=mask_dict)
+        compact_dict = {}
+        return compact_representation, compact_dict
 
-    def generate(self, tensors_batch, indices_batch):
+    def generate(self, tensors_batch, indices_batch, mask_dict=mask_dict):
         # tensors_batch.shape() = batch, seq_length, embedding_size
         # indices batch: list of lists of tuples
-        # [[(0,), (1,), (2, 3, 4), (5,), (6,)]]
+        # [[(0,), (1,), (2, 3, 4), (5,), (6,)], [(etc.)]]
 
         compact_tensors_batch = self.initialize_padding_tensor_like(tensors_batch)
         # as all are zeros, this starts as an all false boolean mask
         batch_size, max_len, _ = tensors_batch.size()
-        mask = torch.zeros((batch_size, max_len), dtype=torch.bool, device=self.device)
+        mask_padding = torch.zeros((batch_size, max_len), dtype=torch.bool, device=self.device)
 
         for b, chunk_indices in enumerate(indices_batch):
             for i, idx_tuple in enumerate(chunk_indices):
@@ -38,9 +39,15 @@ class EmbeddingGenerator():
                 # be something more complex, not just max pooling)
                 joint = self.pool_function(tensors_batch[b, idx_tuple, :].unsqueeze(0))
                 compact_tensors_batch[b, i, :] = joint
-                mask[b, i] = True
+                mask_padding[b, i] = True
+                
+                    
+        # To remove the dimensions in the sequence length where all the sequences are now padded because
+        # of the compression
+        mask_not_all_padding = mask_padding.sum(dim=0) == True
 
-        return compact_tensors_batch, mask
+
+        return compact_tensors_batch[:, mask_not_all_padding, :], mask_padding[:, mask_not_all_padding]
 
     def initialize_padding_tensor_like(self, tensor):
         # this function should be better, like initialize randomly from a distribution, because
@@ -55,4 +62,5 @@ class IdentityGenerator(nn.Module):
         super(IdentityGenerator, self).__init__()
 
     def forward(self, x, *args, **kwargs):
-        return x
+        compact_dict = {}
+        return x, compact_dict

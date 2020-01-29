@@ -29,11 +29,15 @@ class End2EndModel(nn.Module):
         self.trainable_modules = trainable_modules
      
     def forward(self, sequences_batch, batch_splits=None):
-        assert batch_splits != None
+        assert batch_splits is not None
         context_representation, masks_dict = self.transformer.forward(sequences_batch, return_masks=True)
-        indices = self.bracketer.forward(context_representation)
-        compact_representation = self.generator.forward(context_representation, indices)
-        output = self.multitasknet.forward(compact_representation, batch_splits=batch_splits)
+        indices = self.bracketer.forward(context_representation, masks_dict=masks_dict)
+        compact_representation, compact_masks_dict = self.generator.forward(context_representation, 
+                                                                            indices, 
+                                                                            masks_dict=masks_dict)
+        output = self.multitasknet.forward(compact_representation, 
+                                           batch_splits=batch_splits, 
+                                           masks_dict=masks_dict)
         return output
 
     def loss(self, batch_prediction, batch_targets, weights=None):
@@ -57,14 +61,16 @@ class MultiTaskNet(nn.Module):
             self.parameters
 
 
-    def forward(self, inp, batch_splits=None):
-        assert batch_splits != None
+    def forward(self, inp, batch_splits=None, masks_dict=None):
+        assert batch_splits is not None
+        assert masks_dict is not None
         output = []
         # eventually this could be parallelized because there's no sequential
         # dependency, but that introduces much complexity in the implementation
         for i, task_net in enumerate(self.parallel_net_list):
             inp_split = inp[batch_splits[i]:batch_splits[i+1], :, :]
-            output.append(task_net.forward(inp_split))
+            seq_pair_mask = masks_dict['seq_pair_mask'][batch_splits[i]:batch_splits[i+1]]
+            output.append(task_net.forward(inp_split, seq_pair_mask=seq_pair_mask))
         return output
 
 
@@ -72,9 +78,9 @@ class MultiTaskNet(nn.Module):
         losses = []
         for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
             losses.append(network.loss(prediction, target))
-        
+        print(losses)
         loss = torch.tensor(losses, device=self.device, requires_grad=True)
-        if weights == None:
+        if weights is None:
             multi_task_loss = torch.mean(loss)
         else:
             weights = torch.tensor(weights, device=self.device)

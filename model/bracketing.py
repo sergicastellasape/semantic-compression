@@ -11,7 +11,7 @@ class NNSimilarityChunker(nn.Module):
     def __init__(self,
                  sim_function=cos,
                  threshold=0.9,
-                 exclude_special_tokens=True,
+                 exclude_special_tokens=False,
                  combinatorics='sequential'):
         super().__init__()
 
@@ -21,21 +21,24 @@ class NNSimilarityChunker(nn.Module):
         assert combinatorics in ['sequential', 'all']
         self.combinatorics = combinatorics
 
-    def forward(self, batch_sequence_tensors: torch.Tensor, threshold=0.9) -> List[List[List]]:
-        indices_to_compact = self.indices_to_compact_by_similarity_threshold(batch_sequence_tensors)
+    def forward(self, batch_sequence_tensors: torch.Tensor, masks_dict=None, threshold=0.9) -> List[List[List]]:
+        assert masks_dict is not None
+        indices_to_compact = self.indices_to_compact_by_similarity_threshold(batch_sequence_tensors, 
+                                                                                                 masks_dict=masks_dict)
         return indices_to_compact
 
-    def indices_to_compact_by_similarity_threshold(self, batch_sequence_tensors) -> List[List]:
-                
+    def indices_to_compact_by_similarity_threshold(self, batch_sequence_tensors, masks_dict=None) -> List[List]:
+        assert masks_dict is not None
         batch_size, seq_length, embedding_size = batch_sequence_tensors.size()  # make sure the input is proper size!!
-        indices = list(range(seq_length))    
-        
+        indices = list(range(seq_length))  
+        regular_tokens_mask = masks_dict['regular_tokens_mask']
+
         # Combinations of indices that are group candidates: only sequential (indices[s:e])
         if self.combinatorics == 'sequential':
-            if self.exclude_special_tokens:
+            if self.exclude_special_tokens: #don't use this, im not 100% sure it's correct
                 idx_combinations = [indices[s:e+1] for s, e in itertools.combinations(range(1, len(indices)), 2)]
             else:
-                idx_combinations = [indices[s:e+1] for s, e in itertools.combinations(range(len(indices)+1), 2)]
+                idx_combinations = [indices[s:e] for s, e in itertools.combinations(range(len(indices)+1), 2)]
         
         # All permutations (extremely time sensitive)
         elif self.combinatorics == 'all':
@@ -55,12 +58,26 @@ class NNSimilarityChunker(nn.Module):
             worst_sim, _ = torch.min(similarities, dim=-1)
             # Construct torch.bool tensor of size (batch,) as a 'mask'
             batch_include_group_mask = worst_sim >= self.threshold
+            
+            if len(indices) > 1:
+                # Are all tokens in the group regular tokens?
+                batch_all_regular_tokens = regular_tokens_mask[:, indices].prod(dim=1) == 1
+            else:
+                # If there is only 1 index we want to include it
+                batch_all_regular_tokens = torch.ones_like(batch_include_group_mask, 
+                                                           dtype=torch.bool,
+                                                           device=self.device)
+
+            # generate logical tensor with only True if both threshold and regular
+            # tokens criteria
+            batch_include = batch_include_group_mask * batch_all_regular_tokens
             # Iterate over mask and fill the List of indices to compact
-            for b, include_group in enumerate(batch_include_group_mask):
+            for b, include_group in enumerate(batch_include):
                 if include_group: batch_all_indices_to_compact[b].append(indices)
 
         batch_indices_to_compact = batch_remove_subsets(batch_all_indices_to_compact)
-        
+        compact_masks_dict = {}
+
         return batch_indices_to_compact
 
 
@@ -71,8 +88,10 @@ class IdentityChunker(nn.Module):
     def __init__(self, *args, **kargs):
         super(IdentityChunker, self).__init__()
 
-    def forward(self, x, *args, **kwargs):
-        return [[None]]*x.size(0)  #return empty list of lists of batch size
+    def forward(self, x, *args, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+        compact_masks_dict = {}
+        return [[None]]*x.size(0), compact_masks_dict  #return empty list of lists of batch size
 
 
 def batch_remove_subsets(batch_L):

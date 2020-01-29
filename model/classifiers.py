@@ -119,7 +119,7 @@ class AttentionClassifier(nn.Module):
         return self.loss_fn(prediction, target)
 
 
-    def forward(self, input, pooling=None):
+    def forward(self, input, pooling=None, **kwargs):
         # concatenate along sequence length dimension so attention is calculated 
         # along both positive and negative sentiments
         query = self.sentiment_queries.repeat(input.size(0), 1, 1) # expand for batch size
@@ -179,12 +179,30 @@ class SeqPairAttentionClassifier(nn.Module):
         self.attention_vecs2 = nn.Parameter(init_normal2.clone().detach().requires_grad_(True).to(device))
 
 
-    def forward(self, input, mask_dict=None):
+    def loss(self, prediction, target):
+        return self.loss_fn(prediction, target)
+
+
+    def forward(self, input, seq_pair_mask=None):
         """
         Input_tup should be a tuple of two tensors, containing the batches 
         """
-        inp_tensor1, inp_tensor2 = input_tup
+        # seq_pair_mask looks like [00000000001111111111] so for the second sentence
+        # one needs to multiply by the mask and for the first one it's the negation
+        #print('seq pair original mask:', seq_pair_mask[0, :])
+        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size())
+        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size())
 
+        #mask_2 = seq_pair_mask.unsqueeze(-1).expand(input.size())
+        #mask_1 = ~mask_2
+        #print('MASK 1!', mask_1[0, :, 0])
+        #print('MASK 2!', mask_2[0, :, 0])
+
+        inp_tensor1 = input * mask_1
+        inp_tensor2 = input * mask_2
+
+        #print(inp_tensor1[0, :, 0])
+        #print(inp_tensor2[0, :, 0])
         # concatenate along sequence length dimension so attention is calculated 
         # along both positive and negative sentiments
         query1 = self.attention_vecs1.repeat(inp_tensor1.size(0), 1, 1) # expand for batch size
@@ -209,5 +227,3 @@ class SeqPairAttentionClassifier(nn.Module):
 
         class_logscore = F.log_softmax(class_score, dim=1)
         return class_logscore
-
-
