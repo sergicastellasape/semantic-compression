@@ -25,20 +25,26 @@ class End2EndModel(nn.Module):
         self.bracketer = bracketer
         self.generator = generator
         self.multitasknet = multitasknet
-
         self.trainable_modules = trainable_modules
      
     def forward(self, sequences_batch, batch_splits=None):
         assert batch_splits is not None
+        #print("First two sequences: ", sequences_batch[0:4])
         context_representation, masks_dict = self.transformer.forward(sequences_batch, return_masks=True)
+        #print("Contextual Vecs Size: ", context_representation.size())
         indices = self.bracketer.forward(context_representation, masks_dict=masks_dict)
+        #print("Indices from bracketer, first 2 seq:", indices[0:4])
         compact_representation, compact_masks_dict = self.generator.forward(context_representation, 
                                                                             indices, 
                                                                             masks_dict=masks_dict)
+        
+        ########print("Size of compact representation:", compact_representation.size())
         output = self.multitasknet.forward(compact_representation, 
                                            batch_splits=batch_splits, 
                                            masks_dict=masks_dict)
-        return output
+        ########print('compact_masks_dict:', compact_masks_dict)
+        ########raise ValueError('STOPPPPPPPPPPPP')
+        return output # list of tensors, each tensor is the model prediction for each task
 
     def loss(self, batch_prediction, batch_targets, weights=None):
         return self.multitasknet.loss(batch_prediction, batch_targets, weights=weights)
@@ -57,9 +63,6 @@ class MultiTaskNet(nn.Module):
         self.device = device
         self.parallel_net_list = nn.ModuleList(task_networks)
         self.config = config
-        for network in task_networks:
-            self.parameters
-
 
     def forward(self, inp, batch_splits=None, masks_dict=None):
         assert batch_splits is not None
@@ -78,7 +81,7 @@ class MultiTaskNet(nn.Module):
         losses = []
         for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
             losses.append(network.loss(prediction, target))
-        print(losses)
+        #print(losses)
         loss = torch.tensor(losses, device=self.device, requires_grad=True)
         if weights is None:
             multi_task_loss = torch.mean(loss)

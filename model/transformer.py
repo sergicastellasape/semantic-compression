@@ -59,7 +59,7 @@ class Transformer(nn.Module):
             padding_mask = padded_input_dict['attention_mask']
             special_tokens_mask = self.tokenizer.get_special_tokens_mask(padded_input_dict['input_ids'],
                                                                          already_has_special_tokens=True)
-            inverse_special_tokens_mask = [m-1 for m in special_tokens_mask]
+            inverse_special_tokens_mask = [1-m for m in special_tokens_mask]
             regular_tokens_mask = [m1*m2 for m1, m2
                                    in zip(inverse_special_tokens_mask, padding_mask)]
             
@@ -71,10 +71,13 @@ class Transformer(nn.Module):
         regular_tokens_mask_tensor = torch.tensor(batch_regular_tokens_mask, device=self.device)
         padding_mask_tensor = torch.tensor(batch_padding_mask, device=self.device)
         seq_pair_mask_tensor = torch.tensor(batch_padded_token_type_ids, device=self.device)
-        
+
+        # regular_tokens_mask: 1s=regular token, 0s=special token
+        # padding_mask: 1s=beefy token, 0s=padding tokens
+        # seq_pair_mask: 0s=first sequence, 1s=second sequence, -1s=padding part
         masks_dict = {'regular_tokens_mask' : regular_tokens_mask_tensor,
                       'padding_mask'        : padding_mask_tensor,
                       'seq_pair_mask'       : seq_pair_mask_tensor}
-        
+        ########print("masks_dict:", masks_dict)
         return input_tensor, masks_dict
         

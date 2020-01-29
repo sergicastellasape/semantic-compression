@@ -12,16 +12,18 @@ class NNSimilarityChunker(nn.Module):
                  sim_function=cos,
                  threshold=0.9,
                  exclude_special_tokens=False,
-                 combinatorics='sequential'):
+                 combinatorics='sequential',
+                 device=torch.device('cpu')):
         super().__init__()
 
+        self.device = device
         self.sim_function = sim_function
         self.exclude_special_tokens = exclude_special_tokens
         self.threshold = threshold
         assert combinatorics in ['sequential', 'all']
         self.combinatorics = combinatorics
 
-    def forward(self, batch_sequence_tensors: torch.Tensor, masks_dict=None, threshold=0.9) -> List[List[List]]:
+    def forward(self, batch_sequence_tensors: torch.Tensor, masks_dict=None) -> List[List[List]]:
         assert masks_dict is not None
         indices_to_compact = self.indices_to_compact_by_similarity_threshold(batch_sequence_tensors, 
                                                                                                  masks_dict=masks_dict)
@@ -29,7 +31,7 @@ class NNSimilarityChunker(nn.Module):
 
     def indices_to_compact_by_similarity_threshold(self, batch_sequence_tensors, masks_dict=None) -> List[List]:
         assert masks_dict is not None
-        batch_size, seq_length, embedding_size = batch_sequence_tensors.size()  # make sure the input is proper size!!
+        batch_size, seq_length, _ = batch_sequence_tensors.size()  # make sure the input is proper size!!
         indices = list(range(seq_length))  
         regular_tokens_mask = masks_dict['regular_tokens_mask']
 
@@ -76,7 +78,6 @@ class NNSimilarityChunker(nn.Module):
                 if include_group: batch_all_indices_to_compact[b].append(indices)
 
         batch_indices_to_compact = batch_remove_subsets(batch_all_indices_to_compact)
-        compact_masks_dict = {}
 
         return batch_indices_to_compact
 
