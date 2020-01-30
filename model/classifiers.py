@@ -124,8 +124,7 @@ class AttentionClassifier(nn.Module):
         query = self.sentiment_queries.repeat(input.size(0), 1, 1) # expand for batch size
 
         # sequence is the input
-        context = input
-        self_attended_context, _ = self.self_attend(context, context)
+        self_attended_context, _ = self.self_attend(input, input)
 
         #self_attended_context = self.feedforward(self_attended_context)
 
