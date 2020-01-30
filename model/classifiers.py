@@ -89,9 +89,9 @@ class AttentionClassifier(nn.Module):
         self.pool_mode = pool_mode
 
         # Define attention layers:
-        self.self_attend = Attention(embedding_dim, attention_type='general', device=device)
+        self.self_attend = Attention(embedding_dim, attention_type='general').to(device)
         
-        self.attend = Attention(embedding_dim, attention_type='dot', device=device)
+        self.attend = Attention(embedding_dim, attention_type='dot').to(device)
 
         # The linear layer that maps from embedding state space to sentiment classification space
         if self.pool_mode == 'concat':

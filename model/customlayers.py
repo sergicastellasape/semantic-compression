@@ -29,10 +29,8 @@ class Attention(nn.Module):
          torch.Size([5, 1, 5])
     """
 
-    def __init__(self, dimensions, attention_type='general', device=torch.device('cpu')):
+    def __init__(self, dimensions, attention_type='general'):
         super(Attention, self).__init__()
-
-        self.device = device
 
         if attention_type not in ['dot', 'general']:
             raise ValueError('Invalid attention type selected.')
