@@ -84,7 +84,6 @@ class IdentityGenerator(nn.Module):
     def __init__(self, *args, **kwargs):
         super(IdentityGenerator, self).__init__()
 
-    def forward(self, x, *args, **kwargs):
-        compact_dict = {}
-        return x, compact_dict
-        
+    def forward(self, x, *args, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+        return x, masks_dict
