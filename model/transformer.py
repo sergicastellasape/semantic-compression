@@ -12,7 +12,7 @@ class Transformer(nn.Module):
                  pre_trained_weights='bert-base-uncased',
                  device=torch.device('cpu')):
         super(Transformer, self).__init__()
-        self.device = device
+        self.device = device #stupid comment
         self.model = model_class.from_pretrained(pre_trained_weights, output_hidden_states=True)
         self.tokenizer = tokenizer_class.from_pretrained(pre_trained_weights)
 
