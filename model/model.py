@@ -46,6 +46,8 @@ class End2EndModel(nn.Module):
     def loss(self, batch_prediction, batch_targets, weights=None):
         return self.multitasknet.loss(batch_prediction, batch_targets, weights=weights)
 
+    def metrics(self, predictions, targets):
+        return self.multitasknet.metrics(predictions, targets)
 
 class MultiTaskNet(nn.Module):
     """
@@ -89,3 +91,8 @@ class MultiTaskNet(nn.Module):
 
         return multi_task_loss
 
+    def metrics(self, predictions, targets):
+        metrics = []
+        for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
+            metrics.append(int(correct.sum()) / len(correct))
+        return metrics
