@@ -24,9 +24,9 @@ class Transformer(nn.Module):
                                        attention_mask=masks_dict['padding_mask'])[-1]
         
         if return_masks:
-            return hidden_states_tup[output_layer].detach(), masks_dict
+            return hidden_states_tup[output_layer], masks_dict
         else:
-            return hidden_states_tup[output_layer].detach()
+            return hidden_states_tup[output_layer]
 
 
     def batch_encode(self, batch_sequences):                             
