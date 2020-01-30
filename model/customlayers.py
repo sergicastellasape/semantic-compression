@@ -45,7 +45,6 @@ class Attention(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         self.tanh = nn.Tanh()
     
-        
     def forward(self, query, context):
         """
         Args:
