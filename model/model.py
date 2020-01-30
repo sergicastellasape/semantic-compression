@@ -94,5 +94,8 @@ class MultiTaskNet(nn.Module):
     def metrics(self, predictions, targets):
         metrics = []
         for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
+            correct = torch.argmax(prediction, dim=1) == target
             metrics.append(int(correct.sum()) / len(correct))
+
         return metrics
+
