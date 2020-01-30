@@ -42,6 +42,7 @@ class Attention(nn.Module):
         self.linear_out = nn.Linear(dimensions * 2, dimensions, bias=False)
         self.softmax = nn.Softmax(dim=-1)
         self.tanh = nn.Tanh()
+        
     
     def forward(self, query, context):
         """
