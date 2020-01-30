@@ -14,6 +14,7 @@ class Transformer(nn.Module):
         super(Transformer, self).__init__()
         self.device = device #stupid comment
         self.model = model_class.from_pretrained(pre_trained_weights, output_hidden_states=True)
+        self.model.to(device)
         self.tokenizer = tokenizer_class.from_pretrained(pre_trained_weights)
 
 
