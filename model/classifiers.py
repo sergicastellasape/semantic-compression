@@ -49,12 +49,12 @@ class BiLSTMClassifier(nn.Module):
         return self.loss_fn(predicted, target)
 
 
-    def forward(self, input, pooling=None):
+    def forward(self, input, pooling=None, **kwargs):
 
         # Calculate original lengths
         collapse_embedding_dim_tensors = input.sum(dim=2) # all elements in the embedding need to be 0
         B = torch.zeros_like(input[:, :, 0]) != collapse_embedding_dim_tensors # this gives a boolean matrix of size (batch, max_seq_length)
-        lengths = B.sum(dim=1).to(device=device) # summing the dimension of sequence length gives the original length
+        lengths = B.sum(dim=1).to(device=self.device) # summing the dimension of sequence length gives the original length
 
         packed_tensors = hotfix_pack_padded_sequence(input, lengths, enforce_sorted=False, batch_first=True)
 
@@ -82,11 +82,10 @@ class BiLSTMClassifier(nn.Module):
 
 
 class AttentionClassifier(nn.Module):
-    def __init__(self, embedding_dim, sentset_size, batch_size, dropout=0., n_sentiments=2, pool_mode='concat', device=torch.device('cpu')):
+    def __init__(self, embedding_dim, sentset_size, dropout=0., n_sentiments=2, pool_mode='concat', device=torch.device('cpu')):
         super(AttentionClassifier, self).__init__()
 
         self.device = device
-        self.batch_size = batch_size
         self.pool_mode = pool_mode
 
         # Define attention layers:
@@ -148,7 +147,6 @@ class SeqPairAttentionClassifier(nn.Module):
     def __init__(self, 
                  embedding_dim, 
                  num_classes, 
-                 batch_size, 
                  dropout=0., 
                  n_attention_vecs=4, 
                  pool_mode='concat', 
@@ -156,7 +154,6 @@ class SeqPairAttentionClassifier(nn.Module):
         super(SeqPairAttentionClassifier, self).__init__()
 
         self.device = device
-        self.batch_size = batch_size
         self.pool_mode = pool_mode
 
         # Define attention layers:
@@ -227,3 +224,26 @@ class SeqPairAttentionClassifier(nn.Module):
 
         class_logscore = F.log_softmax(class_score, dim=1)
         return class_logscore
+
+
+class NaivePoolingClassifier(nn.Module):
+    def __init__(self, embedding_dim, num_classes, dropout=0., pool_mdoe='max_pooling', device=torch.device('cpu')):
+        super().__init__()
+
+        self.device = device
+        # network
+        self.classifier = nn.Linear(embedding_dim, num_classes)
+        self.log_softmax = nn.LogSoftmax(dim=1)
+        # loss func
+        self.loss_fn = nn.NLLLoss(reduction='mean')
+
+    def loss(self, prediction, target):
+        return self.loss_fn(prediction, target)
+
+    def forward(self, input, **kwargs):
+        #print('input classifier size', input.size())
+        # input is size (batch, max_seq_length, embedding_dim)
+        pooled_features = abs_max_pooling(input, dim=1)
+        class_score = self.classifier(pooled_features)
+        class_log_score = self.log_softmax(class_score)
+        return class_log_score

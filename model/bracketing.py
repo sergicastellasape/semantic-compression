@@ -105,8 +105,6 @@ def batch_remove_subsets(batch_L):
 
 
 
-
-
 ############################## DEPRECATED ####################################
 # This class was used in other experiments but it won't work here
 """class Chunker():

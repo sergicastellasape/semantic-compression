@@ -87,3 +87,4 @@ class IdentityGenerator(nn.Module):
     def forward(self, x, *args, **kwargs):
         compact_dict = {}
         return x, compact_dict
+        
