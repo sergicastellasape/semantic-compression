@@ -103,7 +103,7 @@ class AttentionClassifier(nn.Module):
             #self.classifier = nn.Sequential(nn.Linear(embedding_dim, 100),
             #                                       nn.ELU,
             #                                       nn.Linear(100, sentset_size))
-            self.classifier = nn.Linear(embedding_dim, sentset_size)
+            self.classifier = nn.Linear(embedding_dim, sentset_size).to(device)
         
         # Loss function as negative log likelihood, which needs a logsoftmax input
         self.loss_fn = nn.NLLLoss(reduction='mean')
@@ -162,7 +162,7 @@ class SeqPairAttentionClassifier(nn.Module):
 
         # The linear layer that maps from embedding state space to sentiment classification space
         layer_multiplier = n_attention_vecs if self.pool_mode == 'concat' else 1
-        self.classifier = nn.Linear(2*embedding_dim*layer_multiplier, num_classes)
+        self.classifier = nn.Linear(2*embedding_dim*layer_multiplier, num_classes).to(device)
         
         # Loss function as negative log likelihood, which needs a logsoftmax input
         self.loss_fn = nn.NLLLoss(reduction='mean')
