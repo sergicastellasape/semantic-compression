@@ -98,7 +98,7 @@ class AttentionClassifier(nn.Module):
             #self.classifier = nn.Sequential(nn.Linear(embedding_dim*n_sentiments, 100),
             #                                nn.ELU(),
             #                                nn.Linear(100, sentset_size))
-            self.classifier = nn.Linear(embedding_dim*n_sentiments, sentset_size)
+            self.classifier = nn.Linear(embedding_dim*n_sentiments, sentset_size).to(device)
         else:
             #self.classifier = nn.Sequential(nn.Linear(embedding_dim, 100),
             #                                       nn.ELU,
