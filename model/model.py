@@ -79,7 +79,7 @@ class MultiTaskNet(nn.Module):
         for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
             # unsqeeze so the size is (1,) and they can be concatenated, 
             # otherwise torch.cat doesn't work for scalar tensors (zero dimensions)
-            target_tensor = torch.tensor(target, device=device)
+            target_tensor = torch.tensor(target, device=self.device)
             losses.append(network.loss(prediction, target).unsqueeze(0)) 
         loss = torch.cat(losses, dim=0)
         if weights is None:
