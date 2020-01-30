@@ -89,9 +89,9 @@ class AttentionClassifier(nn.Module):
         self.pool_mode = pool_mode
 
         # Define attention layers:
-        self.self_attend = Attention(embedding_dim, attention_type='general')
+        self.self_attend = Attention(embedding_dim, attention_type='general', device=device)
         
-        self.attend = Attention(embedding_dim, attention_type='dot')
+        self.attend = Attention(embedding_dim, attention_type='dot', device=device)
 
         # The linear layer that maps from embedding state space to sentiment classification space
         if self.pool_mode == 'concat':
@@ -157,9 +157,9 @@ class SeqPairAttentionClassifier(nn.Module):
         self.pool_mode = pool_mode
 
         # Define attention layers:
-        self.self_attend = Attention(embedding_dim, attention_type='general')
+        self.self_attend = Attention(embedding_dim, attention_type='general', device=device)
         
-        self.attend = Attention(embedding_dim, attention_type='dot')
+        self.attend = Attention(embedding_dim, attention_type='dot', device=device)
 
         # The linear layer that maps from embedding state space to sentiment classification space
         layer_multiplier = n_attention_vecs if self.pool_mode == 'concat' else 1
@@ -187,8 +187,8 @@ class SeqPairAttentionClassifier(nn.Module):
         # seq_pair_mask looks like [00000000001111111111] so for the second sentence
         # one needs to multiply by the mask and for the first one it's the negation
         #print('seq pair original mask:', seq_pair_mask[0, :])
-        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size())
-        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size())
+        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
+        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size()).to(self.device)
 
         #mask_2 = seq_pair_mask.unsqueeze(-1).expand(input.size())
         #mask_1 = ~mask_2
