@@ -13,15 +13,17 @@ class NNSimilarityChunker(nn.Module):
                  threshold=0.9,
                  exclude_special_tokens=False,
                  combinatorics='sequential',
-                 device=torch.device('cpu')):
+                 device=torch.device('cpu'),
+                 chunk_size_limit=8):
         super().__init__()
-
+        
         self.device = device
         self.sim_function = sim_function
         self.exclude_special_tokens = exclude_special_tokens
         self.threshold = threshold
         assert combinatorics in ['sequential', 'all']
         self.combinatorics = combinatorics
+        self.limit = chunk_size_limit 
 
     def forward(self, batch_sequence_tensors: torch.Tensor, masks_dict=None) -> List[List[List]]:
         assert masks_dict is not None
@@ -49,6 +51,12 @@ class NNSimilarityChunker(nn.Module):
                 combinations = list(itertools.combinations(indices, r=L))
                 idx_combinations.extend(combinations)
 
+        # Remove too large groups of indices
+        for b, L in enumerate(idx_combinations):
+            for i, indices in enumerate(L):
+                if len(indices) > self.limit:
+                    idx_combinations[b].pop(i)
+            
         # Initialize empty list of lists of length batch_size
         batch_all_indices_to_compact = [[] for _ in range(batch_size)]
 
