@@ -157,7 +157,7 @@ class SeqPairAttentionClassifier(nn.Module):
 
         # Define attention layers:
         self.self_attend = Attention(embedding_dim, attention_type='general').to(device)
-        
+
         self.attend = Attention(embedding_dim, attention_type='dot').to(device)
 
         # The linear layer that maps from embedding state space to sentiment classification space
@@ -208,18 +208,20 @@ class SeqPairAttentionClassifier(nn.Module):
         self_attended1, _ = self.self_attend(inp_tensor1, inp_tensor1)
         self_attended2, _ = self.self_attend(inp_tensor2, inp_tensor2)
 
-        # attention to the attention_vecs
-        attention_seq1, _ = self.attend(query1, self_attended1)
-        attention_seq2, _ = self.attend(query2, self_attended2)
+        # attention in between two sentences
+        combined_seq, _ = self.self_attend(inp_tensor1, inp_tensor2)
 
-        concatenated_sequence = torch.cat([attention_seq1, attention_seq2], dim=1)
+        # attention to the attention_vecs
+        attention_seq, _ = self.attend(query1, combined_seq)
+
+        #concatenated_sequence = torch.cat([attention_seq1, attention_seq2], dim=1)
 
         if self.pool_mode == 'concat':
-            class_score = self.classifier(concatenated_sequence.flatten(1))
+            class_score = self.classifier(attention_seq.flatten(1))
         elif self.pool_mode == 'mean_pooling':
-            class_score = self.classifier(concatenated_sequence.mean(1))
+            class_score = self.classifier(attention_seq.mean(1))
         elif self.pool_mode == 'max_pooling':
-            class_score = self.classifier(abs_max_pooling(concatenated_sequence, dim=1))
+            class_score = self.classifier(abs_max_pooling(attention_seq, dim=1))
 
         class_logscore = F.log_softmax(class_score, dim=1)
         return class_logscore
@@ -246,3 +248,100 @@ class NaivePoolingClassifier(nn.Module):
         class_score = self.classifier(pooled_features)
         class_log_score = self.log_softmax(class_score)
         return class_log_score
+
+
+class SeqPairFancyClassifier(nn.Module):
+    def __init__(self, 
+                 embedding_dim, 
+                 num_classes, 
+                 dropout=0., 
+                 n_attention_vecs=4, 
+                 pool_mode='concat', 
+                 device=torch.device('cpu')):
+        super(SeqPairAttentionClassifier, self).__init__()
+
+        self.device = device
+        self.pool_mode = pool_mode
+
+        # Define attention layers:
+        self.self_attend = Attention(embedding_dim, attention_type='general').to(device)
+
+        self.attend = Attention(embedding_dim, attention_type='dot').to(device)
+        
+        # Convolutional layer to filter attention weights
+        self.conv = nn.Conv2d(in_channels=1, 
+                              out_channels=1, 
+                              kernel_size=4, 
+                              stride=1)
+        self.conv2 = nn.Conv2d(in_channels=1,
+                               out_channels=1,
+                               kernel_size=5,
+                               stride=3)
+
+        # The linear layer that maps from embedding state space to sentiment classification space
+        self.seq_classifier = nn.Linear(2*embedding_dim*n_attention_vecs, num_classes).to(device)
+        self.weights_classifier = nn.Linear(100, num_classes)
+        self.join_classifiers = nn.Linear(num_classes*2, num_classes)
+
+        # Loss function as negative log likelihood, which needs a logsoftmax input
+        self.loss_fn = nn.NLLLoss(reduction='mean')
+
+        # initialize the vectors that represent attention characteristics,
+        # and add them as model parameters so that they're trained by backprop
+        init_normal1 = torch.empty(1, n_attention_vecs, embedding_dim).normal_(mean=0,std=0.3)
+        init_normal2 = torch.empty(1, n_attention_vecs, embedding_dim).normal_(mean=0,std=0.3)
+        self.attention_vecs1 = nn.Parameter(init_normal1.clone().detach().requires_grad_(True).to(device))
+        self.attention_vecs2 = nn.Parameter(init_normal2.clone().detach().requires_grad_(True).to(device))
+
+
+    def loss(self, prediction, target):
+        return self.loss_fn(prediction, target)
+
+
+    def forward(self, input, seq_pair_mask=None):
+        """
+        Input_tup should be a tuple of two tensors, containing the batches 
+        """
+        # seq_pair_mask looks like [00000000001111111111] so for the second sentence
+        # one needs to multiply by the mask and for the first one it's the negation
+        #print('seq pair original mask:', seq_pair_mask[0, :])
+        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
+        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size()).to(self.device)
+
+        #mask_2 = seq_pair_mask.unsqueeze(-1).expand(input.size())
+        #mask_1 = ~mask_2
+        #print('MASK 1!', mask_1[0, :, 0])
+        #print('MASK 2!', mask_2[0, :, 0])
+
+        inp_tensor1 = input * mask_1
+        inp_tensor2 = input * mask_2
+
+        #print(inp_tensor1[0, :, 0])
+        #print(inp_tensor2[0, :, 0])
+        # concatenate along sequence length dimension so attention is calculated 
+        # along both positive and negative sentiments
+        query1 = self.attention_vecs1.repeat(inp_tensor1.size(0), 1, 1) # expand for batch size
+        query2 = self.attention_vecs2.repeat(inp_tensor2.size(0), 1, 1)
+        
+        # sequence is the input
+        #self_attended1, _ = self.self_attend(inp_tensor1, inp_tensor1)
+        #self_attended2, _ = self.self_attend(inp_tensor2, inp_tensor2)
+
+        # attention in between two sentences. att_weights size (batch, seq1, seq2)
+        combined_seq, att_weights = self.self_attend(inp_tensor1, inp_tensor2)
+
+        convoluted_weights = self.conv(att_weights)
+        weights30by30 = F.interpolate(convoluted_weights.unsqueeze(1), size=(30, 30), mode='bilinear').squeeze(1)
+        weights10by10 = self.conv2(weights30by30)
+        
+        # attention to the attention_vecs
+        attention_seq, _ = self.attend(query1, combined_seq)
+
+        class_score_seq = self.seq_classifier(attention_seq.flatten(1))
+        class_score_weights = self.weights_classifier(weights10by10.flatten(1))
+        score_cat = torch.cat([class_score_seq, class_score_weights], dim=1)
+        joint_score = self.join_classifiers(score_cat)
+        class_logscore = F.log_softmax(joint_score, dim=1)
+        
+        return class_logscore
+

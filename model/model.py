@@ -25,7 +25,7 @@ class End2EndModel(nn.Module):
         self.bracketer = bracketer
         self.generator = generator
         self.multitasknet = multitasknet
-        self.trainable_modules = trainable_modules
+        self.trainable_modules = trainable_modules  # not implemented yet
      
     def forward(self, sequences_batch, batch_splits=None):
         assert batch_splits is not None
