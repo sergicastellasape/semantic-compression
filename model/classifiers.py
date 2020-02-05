@@ -257,7 +257,7 @@ class SeqPairFancyClassifier(nn.Module):
                  dropout=0., 
                  n_attention_vecs=4,  
                  device=torch.device('cpu')):
-        super().__init__()
+        super(SeqPairFancyClassifier, self).__init__()
 
         self.device = device
 
