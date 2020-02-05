@@ -8,6 +8,10 @@ cos = torch.nn.CosineSimilarity(dim=-1, eps=1e-5)  # default similarity func.
 
 
 class NNSimilarityChunker(nn.Module):
+    """
+    This class implements a model that performs "chunking" based on a similarity threshold,
+    as defined by a similarity function (cosine similarity by default).
+    """
     def __init__(self,
                  sim_function=cos,
                  threshold=0.9,
@@ -52,9 +56,12 @@ class NNSimilarityChunker(nn.Module):
                 idx_combinations.extend(combinations)
 
         # Remove too large groups of indices
-        for i, indices in enumerate(idx_combinations):
-            if len(indices) > self.limit:
+        i = 0
+        for indices in idx_combinations.copy():
+            if len(indices) > limit:
                 idx_combinations.pop(i)
+                i -= 1
+            i += 1
             
         # Initialize empty list of lists of length batch_size
         batch_all_indices_to_compact = [[] for _ in range(batch_size)]
