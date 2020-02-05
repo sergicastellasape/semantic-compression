@@ -310,24 +310,13 @@ class SeqPairFancyClassifier(nn.Module):
         mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
         mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size()).to(self.device)
 
-        #mask_2 = seq_pair_mask.unsqueeze(-1).expand(input.size())
-        #mask_1 = ~mask_2
-        #print('MASK 1!', mask_1[0, :, 0])
-        #print('MASK 2!', mask_2[0, :, 0])
-
         inp_tensor1 = input * mask_1
         inp_tensor2 = input * mask_2
 
-        #print(inp_tensor1[0, :, 0])
-        #print(inp_tensor2[0, :, 0])
         # concatenate along sequence length dimension so attention is calculated 
         # along both positive and negative sentiments
         query1 = self.attention_vecs1.repeat(inp_tensor1.size(0), 1, 1) # expand for batch size
         query2 = self.attention_vecs2.repeat(inp_tensor2.size(0), 1, 1)
-        
-        # sequence is the input
-        #self_attended1, _ = self.self_attend(inp_tensor1, inp_tensor1)
-        #self_attended2, _ = self.self_attend(inp_tensor2, inp_tensor2)
 
         # attention in between two sentences. att_weights size (batch, seq1, seq2)
         combined_seq, att_weights = self.self_attend(inp_tensor1, inp_tensor2)

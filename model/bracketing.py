@@ -52,10 +52,9 @@ class NNSimilarityChunker(nn.Module):
                 idx_combinations.extend(combinations)
 
         # Remove too large groups of indices
-        for b, L in enumerate(idx_combinations):
-            for i, indices in enumerate(L):
-                if len(indices) > self.limit:
-                    idx_combinations[b].pop(i)
+        for i, indices in enumerate(idx_combinations):
+            if len(indices) > self.limit:
+                idx_combinations.pop(i)
             
         # Initialize empty list of lists of length batch_size
         batch_all_indices_to_compact = [[] for _ in range(batch_size)]
