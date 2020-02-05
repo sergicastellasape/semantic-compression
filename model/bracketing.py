@@ -58,7 +58,7 @@ class NNSimilarityChunker(nn.Module):
         # Remove too large groups of indices
         i = 0
         for indices in idx_combinations.copy():
-            if len(indices) > limit:
+            if len(indices) > self.limit:
                 idx_combinations.pop(i)
                 i -= 1
             i += 1
