@@ -269,14 +269,17 @@ class SeqPairFancyClassifier(nn.Module):
         self.attend = Attention(embedding_dim, attention_type='dot').to(device)
         
         # Convolutional layer to filter attention weights
-        self.conv = nn.Conv2d(in_channels=1, 
-                              out_channels=1, 
+        self.conv1 = nn.Conv2d(in_channels=1, 
+                              out_channels=3, 
                               kernel_size=4, 
-                              stride=1)
-        self.conv2 = nn.Conv2d(in_channels=1,
-                               out_channels=1,
+                              stride=1,
+                              padding=(0, 0))
+        self.leakyrelu = nn.LeakyReLU(negative_slope=0.01, inplace=False)
+        self.conv2 = nn.Conv2d(in_channels=3,
+                               out_channels=6,
                                kernel_size=5,
-                               stride=3)
+                               stride=3,
+                               padding=(0, 0))
 
         # The linear layer that maps from embedding state space to sentiment classification space
         self.seq_classifier = nn.Linear(2*embedding_dim*n_attention_vecs, num_classes).to(device)
@@ -302,6 +305,7 @@ class SeqPairFancyClassifier(nn.Module):
         """
         Input_tup should be a tuple of two tensors, containing the batches 
         """
+        batch_size = input.size(0)
         # seq_pair_mask looks like [00000000001111111111] so for the second sentence
         # one needs to multiply by the mask and for the first one it's the negation
         #print('seq pair original mask:', seq_pair_mask[0, :])
@@ -330,18 +334,20 @@ class SeqPairFancyClassifier(nn.Module):
         # attention in between two sentences. att_weights size (batch, seq1, seq2)
         combined_seq, att_weights = self.self_attend(inp_tensor1, inp_tensor2)
 
-        convoluted_weights = self.conv(att_weights)
-        weights30by30 = F.interpolate(convoluted_weights.unsqueeze(1), size=(30, 30), mode='bilinear').squeeze(1)
-        weights10by10 = self.conv2(weights30by30)
+        convoluted_weights = self.conv1(att_weights.unsqueeze(1)) # batch, channels, height, width
+        # interpolate to known shape of 30 by 30
+        weights30by30 = F.interpolate(convoluted_weights, size=(30, 30), mode='bilinear)
         
+        # further extract convolutional features and make them deeper
+        weights10by10 = self.conv2(self.leakyrelu(weights30by30)) # batch, 6, 10, 10
+        flattened_weight_features = weights10by10.view()
         # attention to the attention_vecs
         attention_seq, _ = self.attend(query1, combined_seq)
 
         class_score_seq = self.seq_classifier(attention_seq.flatten(1))
-        class_score_weights = self.weights_classifier(weights10by10.flatten(1))
+        class_score_weights = self.weights_classifier(weights10by10.view(batch_size, -1))
         score_cat = torch.cat([class_score_seq, class_score_weights], dim=1)
         joint_score = self.join_classifiers(score_cat)
         class_logscore = F.log_softmax(joint_score, dim=1)
-        
-        return class_logscore
 
+        return class_logscore
