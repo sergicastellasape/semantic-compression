@@ -255,10 +255,9 @@ class SeqPairFancyClassifier(nn.Module):
                  embedding_dim, 
                  num_classes, 
                  dropout=0., 
-                 n_attention_vecs=4, 
-                 pool_mode='concat', 
+                 n_attention_vecs=4,  
                  device=torch.device('cpu')):
-        super(SeqPairAttentionClassifier, self).__init__()
+        super().__init__()
 
         self.device = device
         self.pool_mode = pool_mode
@@ -336,7 +335,7 @@ class SeqPairFancyClassifier(nn.Module):
 
         convoluted_weights = self.conv1(att_weights.unsqueeze(1)) # batch, channels, height, width
         # interpolate to known shape of 30 by 30
-        weights30by30 = F.interpolate(convoluted_weights, size=(30, 30), mode='bilinear)
+        weights30by30 = F.interpolate(convoluted_weights, size=(30, 30), mode='bilinear')
         
         # further extract convolutional features and make them deeper
         weights10by10 = self.conv2(self.leakyrelu(weights30by30)) # batch, 6, 10, 10
