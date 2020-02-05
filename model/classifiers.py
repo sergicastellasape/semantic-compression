@@ -280,8 +280,8 @@ class SeqPairFancyClassifier(nn.Module):
                                padding=(0, 0))
 
         # The linear layer that maps from embedding state space to sentiment classification space
-        self.seq_classifier = nn.Linear(2*embedding_dim*n_attention_vecs, num_classes).to(device)
-        self.weights_classifier = nn.Linear(600, num_classes)
+        self.seq_classifier = nn.Linear(embedding_dim*n_attention_vecs, num_classes).to(device)
+        self.weights_classifier = nn.Linear(486, num_classes) # size of the conv. features
         self.join_classifiers = nn.Linear(num_classes*2, num_classes)
 
         # Loss function as negative log likelihood, which needs a logsoftmax input
