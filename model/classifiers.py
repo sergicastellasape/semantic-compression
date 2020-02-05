@@ -228,7 +228,7 @@ class SeqPairAttentionClassifier(nn.Module):
 
 
 class NaivePoolingClassifier(nn.Module):
-    def __init__(self, embedding_dim, num_classes, dropout=0., pool_mdoe='max_pooling', device=torch.device('cpu')):
+    def __init__(self, embedding_dim, num_classes, dropout=0., pool_mode='max_pooling', device=torch.device('cpu')):
         super().__init__()
 
         self.device = device
@@ -281,7 +281,7 @@ class SeqPairFancyClassifier(nn.Module):
 
         # The linear layer that maps from embedding state space to sentiment classification space
         self.seq_classifier = nn.Linear(2*embedding_dim*n_attention_vecs, num_classes).to(device)
-        self.weights_classifier = nn.Linear(100, num_classes)
+        self.weights_classifier = nn.Linear(600, num_classes)
         self.join_classifiers = nn.Linear(num_classes*2, num_classes)
 
         # Loss function as negative log likelihood, which needs a logsoftmax input
@@ -334,16 +334,16 @@ class SeqPairFancyClassifier(nn.Module):
 
         convoluted_weights = self.conv1(att_weights.unsqueeze(1)) # batch, channels, height, width
         # interpolate to known shape of 30 by 30
-        weights30by30 = F.interpolate(convoluted_weights, size=(30, 30), mode='bilinear')
+        weights3x30x30 = F.interpolate(convoluted_weights, size=(30, 30), mode='bilinear')
         
         # further extract convolutional features and make them deeper
-        weights10by10 = self.conv2(self.leakyrelu(weights30by30)) # batch, 6, 10, 10
-        flattened_weight_features = weights10by10.view()
+        weights6x10x10 = self.conv2(self.leakyrelu(weights3x30x30)) # batch, 6, 10, 10
+        flattened_weight_features = weights6x10x10.view()
         # attention to the attention_vecs
         attention_seq, _ = self.attend(query1, combined_seq)
 
         class_score_seq = self.seq_classifier(attention_seq.flatten(1))
-        class_score_weights = self.weights_classifier(weights10by10.view(batch_size, -1))
+        class_score_weights = self.weights_classifier(weights6x10x10.view(batch_size, -1))
         score_cat = torch.cat([class_score_seq, class_score_weights], dim=1)
         joint_score = self.join_classifiers(score_cat)
         class_logscore = F.log_softmax(joint_score, dim=1)
