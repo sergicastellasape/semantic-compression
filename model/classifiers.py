@@ -338,7 +338,7 @@ class SeqPairFancyClassifier(nn.Module):
         
         # further extract convolutional features and make them deeper
         weights6x10x10 = self.conv2(self.leakyrelu(weights3x30x30)) # batch, 6, 10, 10
-        flattened_weight_features = weights6x10x10.view()
+
         # attention to the attention_vecs
         attention_seq, _ = self.attend(query1, combined_seq)
 
