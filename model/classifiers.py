@@ -260,7 +260,6 @@ class SeqPairFancyClassifier(nn.Module):
         super().__init__()
 
         self.device = device
-        self.pool_mode = pool_mode
 
         # Define attention layers:
         self.self_attend = Attention(embedding_dim, attention_type='general').to(device)
