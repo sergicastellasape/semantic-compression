@@ -73,7 +73,9 @@ class MultiTaskNet(nn.Module):
         for i, task_net in enumerate(self.parallel_net_list):
             inp_split = input[batch_splits[i]:batch_splits[i+1], :, :]
             seq_pair_mask = masks_dict['seq_pair_mask'][batch_splits[i]:batch_splits[i+1], :]
-            output.append(task_net.forward(inp_split, seq_pair_mask=seq_pair_mask))
+            if inp_split.size(0) > 0:
+                output.append(task_net.forward(inp_split, seq_pair_mask=seq_pair_mask))
+
         return output
 
     def loss(self, predictions, targets, weights=None):
@@ -81,7 +83,9 @@ class MultiTaskNet(nn.Module):
         for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
             # unsqeeze so the size is (1,) and they can be concatenated, 
             # otherwise torch.cat doesn't work for scalar tensors (zero dimensions)
-            losses.append(network.loss(prediction, target).unsqueeze(0)) 
+            if prediction.size(0) > 0: # skip empty model outputs 
+                losses.append(network.loss(prediction, target).unsqueeze(0)) 
+
         loss = torch.cat(losses, dim=0)
         if weights is None:
             multi_task_loss = torch.mean(loss)
@@ -94,8 +98,9 @@ class MultiTaskNet(nn.Module):
     def metrics(self, predictions, targets):
         metrics = []
         for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
-            correct = torch.argmax(prediction, dim=1) == target
-            metrics.append(int(correct.sum()) / len(correct))
-
+            if prediction.size(0) > 0:
+                correct = torch.argmax(prediction, dim=1) == target
+                metrics.append(int(correct.sum()) / len(correct))
+    
         return metrics
 
