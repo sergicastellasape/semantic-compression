@@ -30,17 +30,13 @@ class End2EndModel(nn.Module):
     def forward(self, sequences_batch, batch_splits=None):
         assert batch_splits is not None
         context_representation, masks_dict = self.transformer.forward(sequences_batch, return_masks=True)
-        # print('output of transformer size:', context_representation.size())
         indices = self.bracketer.forward(context_representation, masks_dict=masks_dict)
         compact_representation, compact_masks_dict = self.generator.forward(context_representation, 
                                                                             indices, 
                                                                             masks_dict=masks_dict)
-        #print("'compact' representation size:", compact_representation.size())
-        #print('difference between original and compact', context_representation - compact_representation)
         output = self.multitasknet.forward(compact_representation,
                                            batch_splits=batch_splits,
                                            masks_dict=compact_masks_dict)
-        #print('output multitask net first tensor of list size', output[0].size())
         return output # list of tensors, each tensor is the model prediction for each task
 
     def loss(self, batch_prediction, batch_targets, weights=None):
@@ -68,7 +64,7 @@ class MultiTaskNet(nn.Module):
         assert masks_dict is not None
         output = []
         # eventually this could be parallelized because there's no sequential
-        # dependency, but makes the implementation more complex, given the 
+        # dependency, but makes the implementation more complex, given that the 
         # input for each parallel net is different
         for i, task_net in enumerate(self.parallel_net_list):
             inp_split = input[batch_splits[i]:batch_splits[i+1], :, :]
@@ -83,7 +79,7 @@ class MultiTaskNet(nn.Module):
         for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
             # unsqeeze so the size is (1,) and they can be concatenated, 
             # otherwise torch.cat doesn't work for scalar tensors (zero dimensions)
-            if prediction.size(0) > 0: # skip empty model outputs 
+            if prediction.size(0) > 0:  # skip if empty model outputs to avoid 'empty tensor' errors 
                 losses.append(network.loss(prediction, target).unsqueeze(0)) 
 
         loss = torch.cat(losses, dim=0)

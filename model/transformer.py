@@ -20,15 +20,15 @@ class Transformer(nn.Module):
         self.output_layer = output_layer
 
 
-    def forward(self, batch_sequences, output_layer=self.output_layer, return_masks=False):
+    def forward(self, batch_sequences, return_masks=False):
         batch_input_ids, masks_dict = self.batch_encode(batch_sequences)
         hidden_states_tup = self.model(batch_input_ids, 
                                        attention_mask=masks_dict['padding_mask'])[-1]
         
         if return_masks:
-            return hidden_states_tup[output_layer], masks_dict
+            return hidden_states_tup[self.output_layer], masks_dict
         else:
-            return hidden_states_tup[output_layer]
+            return hidden_states_tup[self.output_layer]
 
 
     def batch_encode(self, batch_sequences):                             
