@@ -10,15 +10,17 @@ class Transformer(nn.Module):
                  model_class=BertModel,
                  tokenizer_class=BertTokenizer,
                  pre_trained_weights='bert-base-uncased',
+                 output_layer=-1,
                  device=torch.device('cpu')):
         super(Transformer, self).__init__()
         self.device = device #stupid comment
         self.model = model_class.from_pretrained(pre_trained_weights, output_hidden_states=True)
         self.model.to(device)
         self.tokenizer = tokenizer_class.from_pretrained(pre_trained_weights)
+        self.output_layer = output_layer
 
 
-    def forward(self, batch_sequences, output_layer=-1, return_masks=False):
+    def forward(self, batch_sequences, output_layer=self.output_layer, return_masks=False):
         batch_input_ids, masks_dict = self.batch_encode(batch_sequences)
         hidden_states_tup = self.model(batch_input_ids, 
                                        attention_mask=masks_dict['padding_mask'])[-1]
