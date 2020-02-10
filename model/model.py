@@ -99,4 +99,3 @@ class MultiTaskNet(nn.Module):
                 metrics.append(int(correct.sum()) / len(correct))
     
         return metrics
-
