@@ -222,3 +222,4 @@ while not finished_training:
     global_counter += 1
 
     finished_training = True if (time.time() - initial_time) > wall_time else False
+    
