@@ -10,7 +10,7 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=castella.sergi@gmail.com
 
-cd "$TMPDIR"/semantic-compression/
+
 
 module purge
 module load 2019
@@ -20,14 +20,15 @@ module load Python/3.7.5-foss-2018b
 cp -r "$HOME"/semantic-compression/ "$TMPDIR"
 
 # shellcheck disable=SC2164
+cd "$TMPDIR"/semantic-compression/
 source venv/bin/activate
 RUN_NAME="base$(date +%d_%m_%Y_%H_%M_%S)";
 python3 scripts/base_training.py --run-identifier ${RUN_NAME} -thr 1 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 300 >> "output_${RUN_NAME}.txt"
-cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression
+cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs
 
 RUN_NAME="comp$(date +%d_%m_%Y_%H_%M_%S)";
 python3 scripts/comp_training.py --run-identifier ${RUN_NAME} -thr 0.8 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 300 >> "output_${RUN_NAME}.txt"
 cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs
 
-cp -r "tensorboard/" "$HOME"
-cp -r "checkpoints/" "$HOME"
+cp -r "tensorboard/" "$HOME"/semantic-compression/tensorboard
+cp -r "checkpoints/" "$HOME"/semantic-compression/checkpoints
