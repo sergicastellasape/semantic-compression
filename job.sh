@@ -24,11 +24,11 @@ cd "$TMPDIR"/semantic-compression/
 source venv/bin/activate
 RUN_NAME="base$(date +%d_%m_%Y_%H_%M_%S)";
 python3 scripts/base_training.py --run-identifier ${RUN_NAME} -thr 1 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 300 >> "output_${RUN_NAME}.txt"
-cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs
+cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs/
 
 RUN_NAME="comp$(date +%d_%m_%Y_%H_%M_%S)";
 python3 scripts/comp_training.py --run-identifier ${RUN_NAME} -thr 0.8 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 300 >> "output_${RUN_NAME}.txt"
-cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs
+cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs/
 
-cp -r "tensorboard/" "$HOME"/semantic-compression/tensorboard
-cp -r "checkpoints/" "$HOME"/semantic-compression/checkpoints
+cp -r "tensorboard/" "$HOME"/semantic-compression
+cp -r "checkpoints/" "$HOME"/semantic-compression
