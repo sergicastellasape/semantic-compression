@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=trainint_test
 #SBATCH --nodes=1
-#SBATCH --time=0:25:00
+#SBATCH --time=4:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
@@ -23,11 +23,11 @@ cp -r "$HOME"/semantic-compression/ "$TMPDIR"
 cd "$TMPDIR"/semantic-compression/
 source venv/bin/activate
 RUN_NAME="base$(date +%d_%m_%Y_%H_%M_%S)";
-python3 scripts/base_training.py --run-identifier ${RUN_NAME} -thr 1 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 600 >> "output_${RUN_NAME}.txt"
+python3 scripts/base_training.py --run-identifier ${RUN_NAME} -thr 1 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 5000 >> "output_${RUN_NAME}.txt"
 cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs
 
 RUN_NAME="comp$(date +%d_%m_%Y_%H_%M_%S)";
-python3 scripts/comp_training.py --run-identifier ${RUN_NAME} -thr 0.8 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 600 >> "output_${RUN_NAME}.txt"
+python3 scripts/comp_training.py --run-identifier ${RUN_NAME} -thr 0.8 --tensorboard-dir tensorboard --eval-periodicity 50 --wall-time 7200 >> "output_${RUN_NAME}.txt"
 cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression/outputs
 
 cp -r "tensorboard/" "$HOME"/semantic-compression
