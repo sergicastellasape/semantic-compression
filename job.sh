@@ -29,3 +29,4 @@ python3 scripts/comp_training.py --run-identifier ${RUN_NAME} -thr 0.8 --tensorb
 cp "output_${RUN_NAME}.txt" "$HOME"/semantic-compression
 
 cp "tensorboard/" "$HOME"/tensorboard
+cp "checkpoints/" "$HOME"/checkpoints
