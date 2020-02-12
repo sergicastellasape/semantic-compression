@@ -37,6 +37,9 @@ parser.add_argument('--eval-periodicity', '-evalperiod',
                     dest='eval_periodicity', type=int, required=False, default=20)
 parser.add_argument('--load-checkpoint', '-load',
                     dest='load_checkpoint', required=False, action='store_true')
+parser.add_argument('--wall-time', '-wt',
+                    dest='walltime', required=False, type=int, default=3600, 
+                    help='Walltime for training')
 
 args = parser.parse_args()
 if args.load_checkpoint:
@@ -108,7 +111,6 @@ torch.manual_seed(0)
 LOG_DIR = args.log_dir
 run_identifier = args.run_id
 eval_periodicity = args.eval_periodicity
-wall_time = 1000 # a 2 hour training as a wall-time
 
 # Tensorboard init
 writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, run_identifier), comment=args.tensorboard_comment)
@@ -213,5 +215,5 @@ while not finished_training:
     writer.add_scalars(f'{run_identifier}/metrics/dev', metrics_dict, global_counter)
     global_counter += 1
 
-    finished_training = True if (time.time() - initial_time) > wall_time else False
+    finished_training = True if (time.time() - initial_time) > args.walltime else False
     

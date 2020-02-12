@@ -37,6 +37,9 @@ parser.add_argument('--eval-periodicity', '-evalperiod',
                     dest='eval_periodicity', type=int, required=False, default=20)
 parser.add_argument('--load-checkpoint', '-load',
                     dest='load_checkpoint', required=False, action='store_true')
+parser.add_argument('--wall-time', '-wt',
+                    dest='walltime', required=False, type=int, default=3600, 
+                    help='Walltime for training')
 
 args = parser.parse_args()
 #############################################################################
@@ -212,5 +215,5 @@ while not finished_training:
     writer.add_scalars(f'{run_identifier}/metrics/dev', metrics_dict, global_counter)
     global_counter += 1
 
-    finished_training = True if (time.time() - initial_time) > wall_time else False
+    finished_training = True if (time.time() - initial_time) > args.walltime else False
     
