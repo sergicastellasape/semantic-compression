@@ -26,8 +26,11 @@ parser.add_argument('--run-identifier', '-id',
                     dest='run_id', type=str, required=True,
                     help='Add an identifier that will be used to store the run in tensorboard.')
 parser.add_argument('--similarity-threshold', '-thr', 
-                    dest='sim_threshold', type=float, required=True,
+                    dest='sim_threshold', type=float, required=False, default=1
                     help='Similarity threshold used for chunking in the embedding space.')
+parser.add_argument('--learning-rate', '-lr',
+                    dest='lr', type=float, required=False, default=0.0001,
+                    help="Learning rate for Adam optimizer")
 parser.add_argument('--tensorboard-dir', '-tbdir',
                     dest='log_dir', type=str, required=False, default='./tensorboard',
                     help='rood directory where tensorboard logs are stored. ./tensorboard by default')
@@ -37,15 +40,16 @@ parser.add_argument('--eval-periodicity', '-evalperiod',
                     dest='eval_periodicity', type=int, required=False, default=20)
 parser.add_argument('--load-checkpoint', '-load',
                     dest='load_checkpoint', required=False, action='store_true')
+parser.add_argument('--wall-time', '-wt',
+                    dest='walltime', required=False, type=int, default=3600, 
+                    help='Walltime for training')
 
 args = parser.parse_args()
-print('load checkpoints?', args.load_checkpoint)
+if args.load_checkpoint:
+    assert os.path.exists(f'/checkpoints/{args.run_id}'), "Checkpoint for run_id doesn't exist!"
 #############################################################################
 ############################### LOAD DATASETS ############################### 
-DATA_SST_TRAIN = pd.read_csv('./assets/datasets/SST2/train.tsv', sep='\t')
-DATA_SST_TEST = pd.read_csv('./assets/datasets/SST2/test.tsv', sep='\t')
-DATA_SST_DEV = pd.read_csv('./assets/datasets/SST2/dev.tsv', sep='\t')
-
+print('Loading datasets...')
 columns = ['id', 'qid1', 'qid2', 'question1', 'question2', 'is_duplicate']
 types_dict = {'id': int, 'qid1': int, 'qid2': int , 
               'question1': str, 'question2': str, 'is_duplicate': int}
@@ -66,15 +70,8 @@ transformer_net = Transformer(model_class=BertModel,
                               output_layer=-2,
                               device=device)
 
-bracketing_net = NNSimilarityChunker(sim_function=cos,
-                                     threshold=args.sim_threshold,
-                                     exclude_special_tokens=False,
-                                     combinatorics='sequential',
-                                     chunk_size_limit=4,
-                                     device=device)
-
-generator_net = EmbeddingGenerator(pool_function=abs_max_pooling, 
-                                   device=device)
+bracketing_net = IdentityChunker().to(device)
+generator_net = IdentityGenerator().to(device)
 
 seq_classifier = AttentionClassifier(embedding_dim=768,
                                      sentset_size=2,
@@ -89,18 +86,10 @@ seq_pair_classifier = SeqPairFancyClassifier(embedding_dim=768,
                                              n_attention_vecs=2,
                                              device=device)#.to(device)
 
-naive_classifier = NaivePoolingClassifier(embedding_dim=768, 
-                                          num_classes=2, 
-                                          dropout=0., 
-                                          pool_mode='max_pooling', 
-                                          device=device).to(device)
 
-multitask_net = MultiTaskNet(seq_classifier,
-                             seq_pair_classifier,
+multitask_net = MultiTaskNet(seq_pair_classifier,
                              device=device).to(device)
 
-bracketing_net = IdentityChunker().to(device)
-generator_net = IdentityGenerator().to(device)
 
 model = End2EndModel(transformer=transformer_net,
                      bracketer=bracketing_net,
@@ -109,14 +98,12 @@ model = End2EndModel(transformer=transformer_net,
                      device=device).to(device)
 
 
-
 ##########################################################################
 ########################## DEFINE CONSTANTS ##############################
-torch.manual_seed(0)
+torch.manual_seed(10)
 LOG_DIR = args.log_dir
 run_identifier = args.run_id
 eval_periodicity = args.eval_periodicity
-wall_time = 3600 # an hour training as a wall-time
 
 # Tensorboard init
 writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, run_identifier), comment=args.tensorboard_comment)
@@ -125,13 +112,13 @@ if args.load_checkpoint:
     model.load_state_dict(torch.load(checkpoints_path))
 
 # Dicts
+datasets = ['QQP'] # here the datasets in training
 counter = {'SST2': 0, 'QQP': 0}
 batch_size = {'SST2': 16, 'QQP': 16}
 n_batches = {'SST2': math.floor(len(DATA_SST_TRAIN)/16), 'QQP': math.floor(len(DATA_QQP_TRAIN)/16)}
 get_batch_function = {'SST2': get_batch_SST2_from_indices, 'QQP': get_batch_QQP_from_indices}
 dataframe = {'SST2': DATA_SST_TRAIN, 'QQP': DATA_QQP_TRAIN}
 dev_dataframes_dict = {'SST2': DATA_SST_DEV, 'QQP': DATA_QQP_DEV}
-datasets = ['SST2','QQP'] # here the datasets in training
 batch_indices = {}
 
 
@@ -143,7 +130,7 @@ global_counter, losseval, max_acc = 0, 0, 0
 ########################### ACUTAL TRAINING ##############################
 initial_time = time.time()
 optimizer = torch.optim.Adam(multitask_net.parameters(), 
-                             lr=0.0001,
+                             lr=args.lr,
                              betas=(0.9, 0.999),
                              eps=1e-08, 
                              weight_decay=0.0001, 
@@ -221,5 +208,5 @@ while not finished_training:
     writer.add_scalars(f'{run_identifier}/metrics/dev', metrics_dict, global_counter)
     global_counter += 1
 
-    finished_training = True if (time.time() - initial_time) > wall_time else False
+    finished_training = True if (time.time() - initial_time) > args.walltime else False
     
