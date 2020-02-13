@@ -2,10 +2,10 @@
 #SBATCH --job-name=big_memory_run
 #SBATCH --nodes=1
 #SBATCH --time=5:00:00
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --partition=gpu
-#SBATCH --mem=62.5G
+#SBATCH --mem=40G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=castella.sergi@gmail.com
 
