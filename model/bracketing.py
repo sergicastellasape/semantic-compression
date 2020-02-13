@@ -1,6 +1,7 @@
 import itertools
 from typing import List
 import re
+import sklearn
 import torch
 import torch.nn as nn
 
@@ -94,6 +95,29 @@ class NNSimilarityChunker(nn.Module):
         batch_indices_to_compact = batch_remove_subsets(batch_all_indices_to_compact)
 
         return batch_indices_to_compact
+
+
+class MeanShiftChunker(nn.Module):
+    """
+    Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors
+    """
+    def __init__(self, 
+                 sim_function=cos,
+                 bandwidth=0.9,
+                 device=torch.device('cpu')):
+        self.device = device
+        self.sim_function = sim_function
+        self.threshold = threshold
+        self.cluster = sklearn.cluster.MeanShift(bandwidth=bandwidth, bin_seeding=True)
+    def forward(self, input):
+    
+    def indices_to_compact(self, batch_sequence_tensors, masks_dict=None) -> List[List]:
+        assert masks_dict is not None
+        batch_size, seq_length, _ = batch_sequence_tensors.size()  # make sure the input is proper size!!
+        regular_tokens_mask = masks_dict['regular_tokens_mask']
+        ## To be continued
+        return None
+
 
 
 class IdentityChunker(nn.Module):

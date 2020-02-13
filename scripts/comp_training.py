@@ -28,6 +28,9 @@ parser.add_argument('--run-identifier', '-id',
 parser.add_argument('--similarity-threshold', '-thr', 
                     dest='sim_threshold', type=float, required=True,
                     help='Similarity threshold used for chunking in the embedding space.')
+parser.add_argument('--learning-rate', '-lr',
+                    dest='lr', type=float, required=False, default=0.0001,
+                    help="Learning rate for Adam optimizer")
 parser.add_argument('--tensorboard-dir', '-tbdir',
                     dest='log_dir', type=str, required=False, default='./tensorboard',
                     help='rood directory where tensorboard logs are stored. ./tensorboard by default')
@@ -106,7 +109,7 @@ model = End2EndModel(transformer=transformer_net,
 
 ##########################################################################
 ########################## DEFINE CONSTANTS ##############################
-torch.manual_seed(0)
+torch.manual_seed(10)
 LOG_DIR = args.log_dir
 run_identifier = args.run_id
 eval_periodicity = args.eval_periodicity
@@ -137,7 +140,7 @@ global_counter, losseval, max_acc = 0, 0, 0
 ########################### ACUTAL TRAINING ##############################
 initial_time = time.time()
 optimizer = torch.optim.Adam(multitask_net.parameters(), 
-                             lr=0.0001,
+                             lr=args.lr,
                              betas=(0.9, 0.999),
                              eps=1e-08, 
                              weight_decay=0.0001, 
