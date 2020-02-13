@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=castella.sergi@gmail.com
 
