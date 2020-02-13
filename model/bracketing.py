@@ -110,6 +110,7 @@ class MeanShiftChunker(nn.Module):
         self.threshold = threshold
         self.cluster = sklearn.cluster.MeanShift(bandwidth=bandwidth, bin_seeding=True)
     def forward(self, input):
+        return None
     
     def indices_to_compact(self, batch_sequence_tensors, masks_dict=None) -> List[List]:
         assert masks_dict is not None
