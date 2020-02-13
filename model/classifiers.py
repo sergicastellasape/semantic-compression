@@ -185,20 +185,12 @@ class SeqPairAttentionClassifier(nn.Module):
         """
         # seq_pair_mask looks like [00000000001111111111] so for the second sentence
         # one needs to multiply by the mask and for the first one it's the negation
-        #print('seq pair original mask:', seq_pair_mask[0, :])
         mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
         mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size()).to(self.device)
-
-        #mask_2 = seq_pair_mask.unsqueeze(-1).expand(input.size())
-        #mask_1 = ~mask_2
-        #print('MASK 1!', mask_1[0, :, 0])
-        #print('MASK 2!', mask_2[0, :, 0])
 
         inp_tensor1 = input * mask_1
         inp_tensor2 = input * mask_2
 
-        #print(inp_tensor1[0, :, 0])
-        #print(inp_tensor2[0, :, 0])
         # concatenate along sequence length dimension so attention is calculated 
         # along both positive and negative sentiments
         query1 = self.attention_vecs1.repeat(inp_tensor1.size(0), 1, 1) # expand for batch size
@@ -213,8 +205,6 @@ class SeqPairAttentionClassifier(nn.Module):
 
         # attention to the attention_vecs
         attention_seq, _ = self.attend(query1, combined_seq)
-
-        #concatenated_sequence = torch.cat([attention_seq1, attention_seq2], dim=1)
 
         if self.pool_mode == 'concat':
             class_score = self.classifier(attention_seq.flatten(1))
@@ -323,7 +313,7 @@ class SeqPairFancyClassifier(nn.Module):
 
         convoluted_weights = self.conv1(att_weights.unsqueeze(1)) # batch, channels, height, width
         # interpolate to known shape of 30 by 30
-        weights3x30x30 = F.interpolate(convoluted_weights, size=(30, 30), mode='bilinear')
+        weights3x30x30 = F.interpolate(convoluted_weights, size=(30, 30), mode='bilinear', align_corners=True)
         
         # further extract convolutional features and make them deeper
         weights6x10x10 = self.conv2(self.leakyrelu(weights3x30x30)) # batch, 6, 10, 10
