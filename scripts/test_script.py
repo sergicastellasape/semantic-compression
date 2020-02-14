@@ -50,6 +50,10 @@ if args.load_checkpoint:
 #############################################################################
 ############################### LOAD DATASETS ############################### 
 print('Loading datasets...')
+DATA_SST_TRAIN = pd.read_csv('./assets/datasets/SST2/train.tsv', sep='\t')
+DATA_SST_TEST = pd.read_csv('./assets/datasets/SST2/test.tsv', sep='\t')
+DATA_SST_DEV = pd.read_csv('./assets/datasets/SST2/dev.tsv', sep='\t')
+
 columns = ['id', 'qid1', 'qid2', 'question1', 'question2', 'is_duplicate']
 types_dict = {'id': int, 'qid1': int, 'qid2': int , 
               'question1': str, 'question2': str, 'is_duplicate': int}
