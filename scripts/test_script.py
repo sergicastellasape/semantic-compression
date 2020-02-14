@@ -104,7 +104,7 @@ model = End2EndModel(transformer=transformer_net,
 
 ##########################################################################
 ########################## DEFINE CONSTANTS ##############################
-torch.manual_seed(10)
+#torch.manual_seed(10)
 LOG_DIR = args.log_dir
 run_identifier = args.run_id
 eval_periodicity = args.eval_periodicity
