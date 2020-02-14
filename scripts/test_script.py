@@ -26,7 +26,7 @@ parser.add_argument('--run-identifier', '-id',
                     dest='run_id', type=str, required=True,
                     help='Add an identifier that will be used to store the run in tensorboard.')
 parser.add_argument('--similarity-threshold', '-thr', 
-                    dest='sim_threshold', type=float, required=False, default=1
+                    dest='sim_threshold', type=float, required=False, default=1,
                     help='Similarity threshold used for chunking in the embedding space.')
 parser.add_argument('--learning-rate', '-lr',
                     dest='lr', type=float, required=False, default=0.0001,
@@ -46,7 +46,7 @@ parser.add_argument('--wall-time', '-wt',
 
 args = parser.parse_args()
 if args.load_checkpoint:
-    assert os.path.exists(f'/checkpoints/{args.run_id}'), "Checkpoint for run_id doesn't exist!"
+    assert os.path.exists(f'assets/checkpoints/{args.run_id}'), "Checkpoint for run_id doesn't exist!"
 #############################################################################
 ############################### LOAD DATASETS ############################### 
 print('Loading datasets...')
