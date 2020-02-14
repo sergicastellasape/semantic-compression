@@ -104,7 +104,7 @@ model = End2EndModel(transformer=transformer_net,
 
 ##########################################################################
 ########################## DEFINE CONSTANTS ##############################
-#torch.manual_seed(10)
+torch.manual_seed(10)
 LOG_DIR = args.log_dir
 run_identifier = args.run_id
 eval_periodicity = args.eval_periodicity
@@ -122,7 +122,8 @@ batch_size = {'SST2': 16, 'QQP': 16}
 n_batches = {'SST2': math.floor(len(DATA_SST_TRAIN)/16), 'QQP': math.floor(len(DATA_QQP_TRAIN)/16)}
 get_batch_function = {'SST2': get_batch_SST2_from_indices, 'QQP': get_batch_QQP_from_indices}
 dataframe = {'SST2': DATA_SST_TRAIN, 'QQP': DATA_QQP_TRAIN}
-dev_dataframes_dict = {'SST2': DATA_SST_DEV, 'QQP': DATA_QQP_DEV}
+#dev_dataframes_dict = {'SST2': DATA_SST_DEV, 'QQP': DATA_QQP_DEV}
+dev_dataframes_dict = {'QQP': DATA_QQP_DEV}
 batch_indices = {}
 
 
