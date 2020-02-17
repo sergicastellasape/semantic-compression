@@ -130,7 +130,7 @@ class IdentityChunker(nn.Module):
 
     def forward(self, x, *args, masks_dict=None, **kwargs):
         assert masks_dict is not None
-        return [[None]]*x.size(0), masks_dict  #return empty list of lists of batch size
+        return [[None]]*x.size(0)  #return empty list of lists of batch size
 
 
 def batch_remove_subsets(batch_L):

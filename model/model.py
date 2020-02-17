@@ -6,7 +6,6 @@ operate "in parallel"
 import torch.nn as nn
 import torch
 
-
 class End2EndModel(nn.Module):
     """
     End2EndModel docstring
@@ -27,13 +26,19 @@ class End2EndModel(nn.Module):
         self.multitasknet = multitasknet
         self.trainable_modules = trainable_modules  # not implemented yet
      
-    def forward(self, sequences_batch, batch_splits=None):
+    def forward(self, sequences_batch, batch_splits=None, compression=None):
+        assert compression is not None
         assert batch_splits is not None
         context_representation, masks_dict = self.transformer.forward(sequences_batch, return_masks=True)
-        indices = self.bracketer.forward(context_representation, masks_dict=masks_dict)
-        compact_representation, compact_masks_dict = self.generator.forward(context_representation, 
-                                                                            indices, 
-                                                                            masks_dict=masks_dict)
+
+        if compression:
+            indices = self.bracketer.forward(context_representation, masks_dict=masks_dict)
+            compact_representation, compact_masks_dict = self.generator.forward(context_representation, 
+                                                                                indices, 
+                                                                                masks_dict=masks_dict)
+        else:
+            compact_representation, compact_masks_dict = context_representation, masks_dict
+
         output = self.multitasknet.forward(compact_representation,
                                            batch_splits=batch_splits,
                                            masks_dict=compact_masks_dict)
@@ -44,6 +49,7 @@ class End2EndModel(nn.Module):
 
     def metrics(self, predictions, targets):
         return self.multitasknet.metrics(predictions, targets)
+
 
 class MultiTaskNet(nn.Module):
     """

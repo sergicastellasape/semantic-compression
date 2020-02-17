@@ -8,7 +8,8 @@ import torch
 from torch.nn.utils.rnn import PackedSequence
 
 
-def eval_model_on_DF(model, dataframes_dict, get_batch_function_dict, batch_size=16, global_counter=0, device=torch.device('cpu')):    
+def eval_model_on_DF(model, dataframes_dict, get_batch_function_dict, batch_size=16, global_counter=0, compression=None, device=torch.device('cpu')):    
+    assert compression is not None
     k=0
     metrics_dict = {}
     for dataset, df in dataframes_dict.items():
@@ -27,7 +28,7 @@ def eval_model_on_DF(model, dataframes_dict, get_batch_function_dict, batch_size
                                               device=device))
             # construct sequences
             batch_sequences.extend([data[0] for data in dataset_batch])
-            batch_predictions = model.forward(batch_sequences, batch_splits=batch_splits)
+            batch_predictions = model.forward(batch_sequences, batch_splits=batch_splits, compression=compression)
             L = model.loss(batch_predictions, batch_targets, weights=None)
             m = model.metrics(batch_predictions, batch_targets)
             dev_acc += m[0]
