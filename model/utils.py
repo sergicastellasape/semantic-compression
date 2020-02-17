@@ -17,7 +17,7 @@ def eval_model_on_DF(model, dataframes_dict, get_batch_function_dict, batch_size
             n_batches = math.floor(len(df)/batch_size)
             batch_splits = [-1]*(len(dataframes_dict)+1)
             batch_splits[k] = 0 # [-1, -1, 0, -1, -1]
-            batch_splits[k+1] = len(df) # [-1, -1, 0, 32400, -1]
+            batch_splits[k+1] = batch_size + 1  #len(df) # [-1, -1, 0, 32400, -1]
             dev_acc = 0
             for i in range(n_batches):
                 batch_targets, batch_sequences = [], []
