@@ -12,29 +12,30 @@ def eval_model_on_DF(model, dataframes_dict, get_batch_function_dict, batch_size
     assert compression is not None
     k=0
     metrics_dict = {}
-    for dataset, df in dataframes_dict.items():
-        n_batches = math.floor(len(df)/batch_size)
-        batch_splits = [-1]*(len(dataframes_dict)+1)
-        batch_splits[k] = 0 # [-1, -1, 0, -1, -1]
-        batch_splits[k+1] = len(df)
-        dev_acc = 0
-        for i in range(n_batches):
-            batch_targets, batch_sequences = [], []
-            indices = list(range(i*batch_size, (i+1)*batch_size))
-            dataset_batch = get_batch_function_dict[dataset](df, indices)
-            # construct targets
-            batch_targets.append(torch.tensor([data[1] for data in dataset_batch], 
-                                              dtype=torch.int64, 
-                                              device=device))
-            # construct sequences
-            batch_sequences.extend([data[0] for data in dataset_batch])
-            batch_predictions = model.forward(batch_sequences, batch_splits=batch_splits, compression=compression)
-            L = model.loss(batch_predictions, batch_targets, weights=None)
-            m = model.metrics(batch_predictions, batch_targets)
-            dev_acc += m[0]
-        k += 1
-        acc = dev_acc/n_batches
-        metrics_dict[dataset] = acc
+    with torch.no_grad():
+        for dataset, df in dataframes_dict.items():
+            n_batches = math.floor(len(df)/batch_size)
+            batch_splits = [-1]*(len(dataframes_dict)+1)
+            batch_splits[k] = 0 # [-1, -1, 0, -1, -1]
+            batch_splits[k+1] = len(df) # [-1, -1, 0, 32400, -1]
+            dev_acc = 0
+            for i in range(n_batches):
+                batch_targets, batch_sequences = [], []
+                indices = list(range(i*batch_size, (i+1)*batch_size))
+                dataset_batch = get_batch_function_dict[dataset](df, indices)
+                # construct targets
+                batch_targets.append(torch.tensor([data[1] for data in dataset_batch], 
+                                                dtype=torch.int64, 
+                                                device=device))
+                # construct sequences
+                batch_sequences.extend([data[0] for data in dataset_batch])
+                batch_predictions = model.forward(batch_sequences, batch_splits=batch_splits, compression=compression)
+                L = model.loss(batch_predictions, batch_targets, weights=None)
+                m = model.metrics(batch_predictions, batch_targets)
+                dev_acc += m[0]
+            k += 1
+            acc = dev_acc/n_batches
+            metrics_dict[dataset] = acc
         
     return metrics_dict
 
