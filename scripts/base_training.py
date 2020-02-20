@@ -213,7 +213,7 @@ while not finished_training:
                                         compression=args.eval_comp,
                                         device=device)
         avg_acc = sum(metrics_dict.values())/len(metrics_dict)
-        torch.empty_cache()
+        torch.cuda.empty_cache()
         if avg_acc > max_acc:
             torch.save(model.state_dict(), checkpoints_path)
             print("NEW CHECKPOINT SAVED!")
