@@ -122,7 +122,7 @@ class AgglomerativeClusteringChunker(nn.Module):
                                              linkage='average',
                                              distance_threshold=self.dist_threshold)
         indices_to_compact = []
-        for embeddings in input.detach().numpy(): # loop over each element in batch
+        for embeddings in input.detach().cpu().numpy(): # loop over each element in batch
             N = cl.fit_predict(embeddings)
             C = Counter(N)
             ordered_idx, i = [], 0

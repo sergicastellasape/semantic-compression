@@ -45,31 +45,28 @@ class EmbeddingGenerator():
                 compact_tensors_batch[b, i, :] = joint
 
                 # update compact masks
-                # only if all are 0s (pad tokens) add it to the padding mask and 
-                if masks_dict['padding_mask'][b, idx_tuple].sum() == 0: 
+                # only if all are 0s (pad tokens) add it to the padding mask and
+                if masks_dict['padding_mask'][b, idx_tuple].sum() == 0:
                     mask_padding[b, i] = 0
                     mask_seq_pair[b, i] = -1
                 else:
                     mask_padding[b, i] = 1
                 # if all tokens are "regular" add the index to the mask
-                if masks_dict['regular_tokens_mask'][b, idx_tuple].prod() == 1: 
+                if masks_dict['regular_tokens_mask'][b, idx_tuple].prod() == 1:
                     mask_regular_tokens[b, i] = 1
                 # if all tokens belong to second sequence, add it to the mask seq pair
-                if masks_dict['seq_pair_mask'][b, idx_tuple].prod() == 1: 
+                if masks_dict['seq_pair_mask'][b, idx_tuple].prod() == 1:
                     mask_seq_pair[b, i] = 1
 
-        ########print("all indices batch:", indices_batch)
         # To remove the dimensions in the sequence length where all the sequences are now padded because
         # of the compression
-        ########print('compressed mask padding before deleting elements:', mask_padding)
         all_padding_elements = mask_padding.sum(dim=0) == 0 # True where ALL elements were kept unchanged
-        ########print('allpadingelementsmask:', all_padding_elements)
         mask_remove_unnecessary_padding = ~all_padding_elements
-        ########print('remove unnecessary padding:', mask_remove_unnecessary_padding)
         compact_dict = {'paddig_mask': mask_padding[:, mask_remove_unnecessary_padding],
                         'regular_tokens_mask': mask_regular_tokens[:, mask_remove_unnecessary_padding],
                         'seq_pair_mask': mask_seq_pair[:, mask_remove_unnecessary_padding]
                         }
+
         return compact_tensors_batch[:, mask_remove_unnecessary_padding, :], compact_dict
 
     def initialize_padding_tensor_like(self, tensor):
