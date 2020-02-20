@@ -1,9 +1,11 @@
 import itertools
 from typing import List
+from collections import Counter
 import re
-import sklearn
+from sklearn import cluster
 import torch
 import torch.nn as nn
+from model.utils import make_connectivity_matrix
 
 cos = torch.nn.CosineSimilarity(dim=-1, eps=1e-5)  # default similarity func.
 
@@ -21,25 +23,25 @@ class NNSimilarityChunker(nn.Module):
                  device=torch.device('cpu'),
                  chunk_size_limit=8):
         super().__init__()
-        
+
         self.device = device
         self.sim_function = sim_function
         self.exclude_special_tokens = exclude_special_tokens
         self.threshold = threshold
         assert combinatorics in ['sequential', 'all']
         self.combinatorics = combinatorics
-        self.limit = chunk_size_limit 
+        self.limit = chunk_size_limit
 
     def forward(self, batch_sequence_tensors: torch.Tensor, masks_dict=None) -> List[List[List]]:
         assert masks_dict is not None
-        indices_to_compact = self.indices_to_compact_by_similarity_threshold(batch_sequence_tensors, 
-                                                                                                 masks_dict=masks_dict)
+        indices_to_compact = self.indices_to_compact_by_similarity_threshold(batch_sequence_tensors,
+                                                                             masks_dict=masks_dict)
         return indices_to_compact
 
     def indices_to_compact_by_similarity_threshold(self, batch_sequence_tensors, masks_dict=None) -> List[List]:
         assert masks_dict is not None
         batch_size, seq_length, _ = batch_sequence_tensors.size()  # make sure the input is proper size!!
-        indices = list(range(seq_length))  
+        indices = list(range(seq_length))
         regular_tokens_mask = masks_dict['regular_tokens_mask']
 
         # Combinations of indices that are group candidates: only sequential (indices[s:e])
@@ -48,8 +50,8 @@ class NNSimilarityChunker(nn.Module):
                 idx_combinations = [indices[s:e+1] for s, e in itertools.combinations(range(1, len(indices)), 2)]
             else:
                 idx_combinations = [indices[s:e] for s, e in itertools.combinations(range(len(indices)+1), 2)]
-        
-        # All permutations (extremely time sensitive)
+
+        # All permutations (permutations explode quickly)
         elif self.combinatorics == 'all':
             idx_combinations = []
             for L in range(2, seq_length+1):
@@ -63,7 +65,7 @@ class NNSimilarityChunker(nn.Module):
                 idx_combinations.pop(i)
                 i -= 1
             i += 1
-            
+
         # Initialize empty list of lists of length batch_size
         batch_all_indices_to_compact = [[] for _ in range(batch_size)]
 
@@ -75,13 +77,13 @@ class NNSimilarityChunker(nn.Module):
             worst_sim, _ = torch.min(similarities, dim=-1)
             # Construct torch.bool tensor of size (batch,) as a 'mask'
             batch_include_group_mask = worst_sim >= self.threshold
-            
+
             if len(indices) > 1:
                 # Are all tokens in the group regular tokens?
                 batch_all_regular_tokens = regular_tokens_mask[:, indices].prod(dim=1) == 1
             else:
                 # If there is only 1 index we want to include it
-                batch_all_regular_tokens = torch.ones_like(batch_include_group_mask, 
+                batch_all_regular_tokens = torch.ones_like(batch_include_group_mask,
                                                            dtype=torch.bool,
                                                            device=self.device)
 
@@ -97,27 +99,40 @@ class NNSimilarityChunker(nn.Module):
         return batch_indices_to_compact
 
 
-class MeanShiftChunker(nn.Module):
+class AgglomerativeClusteringChunker(nn.Module):
     """
     Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors
     """
-    def __init__(self, 
-                 sim_function=cos,
-                 bandwidth=0.9,
+    def __init__(self,
+                 threshold=0.9,
                  device=torch.device('cpu')):
+        super().__init__()
         self.device = device
-        self.sim_function = sim_function
-        self.threshold = threshold
-        self.cluster = sklearn.cluster.MeanShift(bandwidth=bandwidth, bin_seeding=True)
-    def forward(self, input):
-        return None
-    
-    def indices_to_compact(self, batch_sequence_tensors, masks_dict=None) -> List[List]:
-        assert masks_dict is not None
-        batch_size, seq_length, _ = batch_sequence_tensors.size()  # make sure the input is proper size!!
-        regular_tokens_mask = masks_dict['regular_tokens_mask']
-        ## To be continued
-        return None
+        self.dist_threshold = 1-threshold
+        self.id = nn.Identity()
+
+    def forward(self, input, **kwargs):
+        _, length, _ = input.size()
+        connectivity_matrix = make_connectivity_matrix(length)
+        cl = cluster.AgglomerativeClustering(n_clusters=None,
+                                             affinity='cosine',
+                                             memory=None,
+                                             connectivity=connectivity_matrix,
+                                             compute_full_tree=True,
+                                             linkage='average',
+                                             distance_threshold=self.dist_threshold)
+        indices_to_compact = []
+        for embeddings in input.detach().numpy(): # loop over each element in batch
+            N = cl.fit_predict(embeddings)
+            C = Counter(N)
+            ordered_idx, i = [], 0
+            for k, v in C.items():
+                ordered_idx.append(tuple(range(i, i+v)))
+                i += v
+            indices_to_compact.append(ordered_idx)
+
+        return indices_to_compact
+
 
 
 
@@ -146,11 +161,11 @@ def batch_remove_subsets(batch_L):
 ############################## DEPRECATED ####################################
 # This class was used in other experiments but it won't work here
 """class Chunker():
-    def __init__(self, 
-                 layer=-1, 
-                 sim_function=cos, 
-                 threshold=0.9, 
-                 exclude_special_tokens=True, 
+    def __init__(self,
+                 layer=-1,
+                 sim_function=cos,
+                 threshold=0.9,
+                 exclude_special_tokens=True,
                  combinatorics='sequential'):
 
         self.layer = layer
@@ -158,10 +173,10 @@ def batch_remove_subsets(batch_L):
         self.threshold = threshold
         self.exclude_special_tokens = exclude_special_tokens
 
-        if combinatorics not in ['sequential', 'all']: 
+        if combinatorics not in ['sequential', 'all']:
             raise ValueError("You must specify the combinatorics as 'sequencial' or 'all'!!")
         self.combinatorics = combinatorics
-        
+
 
     def compact(self, sentence, threshold=None, layer=None):
         if threshold is not None: self.threshold = threshold
@@ -179,27 +194,27 @@ def batch_remove_subsets(batch_L):
 
 
     def indices_to_compact_by_similarity_threshold(self, sentence) -> List[List]:
-        
+
         sequence_embeddings = sentence.summary['states'][self.layer, :, :]
-        
+
         # combinatorics= 'sequential', 'all'
         seq_length, embedding_size = sequence_embeddings.size() #make sure the input is proper size!!
-        indices = list(range(seq_length))    
-        
+        indices = list(range(seq_length))
+
         # Combinations of indices that are group candidates
         if self.combinatorics == 'sequential':
             if self.exclude_special_tokens:
                 idx_combinations = [indices[s:e] for s, e in itertools.combinations(range(1, len(indices)), 2)]
             else:
                 idx_combinations = [indices[s:e] for s, e in itertools.combinations(range(len(indices)+1), 2)]
-                
+
         elif self.combinatorics == 'all':
             idx_combinations = []
             for L in range(2, seq_length+1):
                 combinations = list(itertools.combinations(indices, r=L))
                 idx_combinations.extend(combinations)
-        
-        
+
+
         all_indices_to_compact = []
         for indices in idx_combinations:
             group_candidate = sequence_embeddings[indices, :]
@@ -210,9 +225,9 @@ def batch_remove_subsets(batch_L):
             similarities = self.sim_function(center, group_candidate)
             worst_sim, _ = torch.min(similarities, dim=0)
             if worst_sim > self.threshold: all_indices_to_compact.append(indices)
-                
+
         indices_to_compact = Chunker.remove_subsets(all_indices_to_compact)
-        
+
         return indices_to_compact
 
 
@@ -224,12 +239,12 @@ def batch_remove_subsets(batch_L):
             center = torch.mean(group, dim=0)
             new_embeddings_list.append(center)
 
-        try:  
+        try:
             new_embeddings = torch.stack(new_embeddings_list, dim=0)
         except:
             print("No chunks were found!")
             new_embeddings = None
-    
+
         return new_embeddings
 
 
@@ -244,7 +259,7 @@ def batch_remove_subsets(batch_L):
                 joint_token = '_'.join(tokens).replace('_##', '')
                 new_tokens.append(joint_token)
             else:
-                
+
                 token = sentence_tokens[chunk_indices[0]]
                 new_tokens.append(token)
 
@@ -256,6 +271,6 @@ def batch_remove_subsets(batch_L):
         filtered = filter(lambda f: not any(set(f) < set(g) for g in L), L)
         return list(filtered)
     """
-    
+
 
 

@@ -1,7 +1,6 @@
-# datasets that will be used in training. 
+# datasets that will be used in training.
 # Make sure the ordering corresponds to the order of the multitasknet architectures
 datasets: ['QQP', SST2]
-
 
 SST2:
   path:
@@ -10,11 +9,11 @@ SST2:
     dev: './assets/datasets/SST2/dev.tsv'
   batch_size: 16
   get_batch_fn: !!python/name:model.data_utils.get_batch_SST2_from_indices # Loads function object
-  counter: 0 
+  counter: 0
 
 QQP:
   path:
-    train: './assets/datasets/QQP/train.tsv' 
+    train: './assets/datasets/QQP/train.tsv'
     test: './assets/datasets/QQP/test.tsv'
     dev: './assets/datasets/QQP/dev.tsv'
   batch_size: 16

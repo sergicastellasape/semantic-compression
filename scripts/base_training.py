@@ -16,7 +16,7 @@ from transformers import BertModel, BertTokenizer
 from model.utils import *
 from model.data_utils import get_batch_SST2_from_indices, get_batch_QQP_from_indices
 from model.transformer import Transformer
-from model.bracketing import IdentityChunker, NNSimilarityChunker, cos
+from model.bracketing import IdentityChunker, NNSimilarityChunker, AgglomerativeClusteringChunker, cos
 from model.generators import IdentityGenerator, EmbeddingGenerator
 from model.classifiers import AttentionClassifier, SeqPairAttentionClassifier, NaivePoolingClassifier, SeqPairFancyClassifier
 from model.model import MultiTaskNet, End2EndModel
@@ -49,6 +49,7 @@ parser.add_argument('--train-compression', '-tc', required=True, type=bool, dest
 parser.add_argument('--eval-compression', '-ec', required=True, type=bool, dest='eval_comp',
                     help="set if compression happens during evaluation, True or False")
 
+
 args = parser.parse_args()
 if args.load_checkpoint:
     assert os.path.exists(f'./assets/checkpoints/{args.run_id}.pt'), "Checkpoint for run_id doesn't exist!"
@@ -56,7 +57,8 @@ if args.load_checkpoint:
 # load config file from datasets
 with open('./config/datasets.yml', 'r') as file:
     config = yaml.load(file, Loader=yaml.Loader)
-
+with open('./config/model.yml', 'r') as file:
+    model_config = yaml.load(file, Loader=yaml.Loader)
 
 #############################################################################
 ############################### LOAD DATASETS ###############################
@@ -79,12 +81,20 @@ transformer_net = Transformer(model_class=BertModel,
                               output_layer=-2,
                               device=device)
 
-bracketing_net = NNSimilarityChunker(sim_function=cos,
-                                     threshold=args.sim_threshold,
-                                     exclude_special_tokens=False,
-                                     combinatorics='sequential',
-                                     chunk_size_limit=4,
-                                     device=device)
+if model_config['chunker'] == 'NNSimilarity':
+    print('Using NNsimilarity chunker')
+    bracketing_net = NNSimilarityChunker(sim_function=cos,
+                                         threshold=args.sim_threshold,
+                                         exclude_special_tokens=False,
+                                         combinatorics='sequential',
+                                         chunk_size_limit=4,
+                                         device=device)
+elif model_config['chunker'] == 'agglomerative':
+    print('Using AGGLOMERATIVE chunker')
+    bracketing_net = AgglomerativeClusteringChunker(threshold=args.sim_threshold,
+                                                    device=device)
+else:
+    raise ValueError("You must provide a valid chunker in config/model.yml")
 
 generator_net = EmbeddingGenerator(pool_function=abs_max_pooling,
                                    device=device)
