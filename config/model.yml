@@ -1,1 +1,1 @@
-chunker: 'agglomerative' # choose between {NNSimilarity, agglomerative}
+chunker: 'NNSimilarity' # choose between {NNSimilarity, agglomerative}

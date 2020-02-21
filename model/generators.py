@@ -8,8 +8,8 @@ import torch.nn as nn
 from model.utils import abs_max_pooling
 
 
-class EmbeddingGenerator():
-    def __init__(self, pool_function=abs_max_pooling, device=torch.device('cpu')):
+class EmbeddingGenerator:
+    def __init__(self, pool_function=abs_max_pooling, device=torch.device("cpu")):
         try:
             t = torch.rand((16, 50, 200))
             _ = pool_function(t)
@@ -20,10 +20,14 @@ class EmbeddingGenerator():
 
     def forward(self, input_tensors, indices, masks_dict=None):
         assert masks_dict is not None
-        compact_representation, compact_masks_dict = self.generate(input_tensors, indices, masks_dict=masks_dict)
-        return compact_representation, compact_masks_dict
+        compact_representation, compact_masks_dict, compression_rate = self.generate(
+            input_tensors, indices, masks_dict=masks_dict
+        )
+        return compact_representation, compact_masks_dict, compression_rate
 
-    def generate(self, tensors_batch, indices_batch, masks_dict=None):
+    def generate(
+        self, tensors_batch, indices_batch, masks_dict=None, return_comp_rate=False
+    ):
         # tensors_batch.shape() = batch, seq_length, embedding_size
         # indices batch: list of lists of tuples
         # [[(0,), (1,), (2, 3, 4), (5,), (6,)], [(etc.)]]
@@ -33,9 +37,15 @@ class EmbeddingGenerator():
         # as all are zeros, this starts as an all false boolean mask
         batch_size, max_len, _ = tensors_batch.size()
 
-        mask_padding = torch.zeros((batch_size, max_len), dtype=torch.int8, device=self.device) #initialize w/ -1 to detect later what didnt change
-        mask_regular_tokens = torch.zeros((batch_size, max_len), dtype=torch.int8, device=self.device)
-        mask_seq_pair = torch.zeros((batch_size, max_len), dtype=torch.int8, device=self.device)
+        mask_padding = torch.zeros(
+            (batch_size, max_len), dtype=torch.int8, device=self.device
+        )  # initialize w/ -1 to detect later what didnt change
+        mask_regular_tokens = torch.zeros(
+            (batch_size, max_len), dtype=torch.int8, device=self.device
+        )
+        mask_seq_pair = torch.zeros(
+            (batch_size, max_len), dtype=torch.int8, device=self.device
+        )
 
         for b, chunk_indices in enumerate(indices_batch):
             for i, idx_tuple in enumerate(chunk_indices):
@@ -46,28 +56,42 @@ class EmbeddingGenerator():
 
                 # update compact masks
                 # only if all are 0s (pad tokens) add it to the padding mask and
-                if masks_dict['padding_mask'][b, idx_tuple].sum() == 0:
+                if masks_dict["padding_mask"][b, idx_tuple].sum() == 0:
                     mask_padding[b, i] = 0
                     mask_seq_pair[b, i] = -1
                 else:
                     mask_padding[b, i] = 1
                 # if all tokens are "regular" add the index to the mask
-                if masks_dict['regular_tokens_mask'][b, idx_tuple].prod() == 1:
+                if masks_dict["regular_tokens_mask"][b, idx_tuple].prod() == 1:
                     mask_regular_tokens[b, i] = 1
                 # if all tokens belong to second sequence, add it to the mask seq pair
-                if masks_dict['seq_pair_mask'][b, idx_tuple].prod() == 1:
+                if masks_dict["seq_pair_mask"][b, idx_tuple].prod() == 1:
                     mask_seq_pair[b, i] = 1
 
         # To remove the dimensions in the sequence length where all the sequences are now padded because
         # of the compression
-        all_padding_elements = mask_padding.sum(dim=0) == 0 # True where ALL elements were kept unchanged
+        all_padding_elements = (
+            mask_padding.sum(dim=0) == 0
+        )  # True where ALL elements were kept unchanged
         mask_remove_unnecessary_padding = ~all_padding_elements
-        compact_dict = {'paddig_mask': mask_padding[:, mask_remove_unnecessary_padding],
-                        'regular_tokens_mask': mask_regular_tokens[:, mask_remove_unnecessary_padding],
-                        'seq_pair_mask': mask_seq_pair[:, mask_remove_unnecessary_padding]
-                        }
+        compact_dict = {
+            "paddig_mask": mask_padding[:, mask_remove_unnecessary_padding],
+            "regular_tokens_mask": mask_regular_tokens[
+                :, mask_remove_unnecessary_padding
+            ],
+            "seq_pair_mask": mask_seq_pair[:, mask_remove_unnecessary_padding],
+        }
 
-        return compact_tensors_batch[:, mask_remove_unnecessary_padding, :], compact_dict
+        compression_rate = (
+            torch.sum(compact_dict["regular_tokens_mask"]).float()
+            / torch.sum(masks_dict["regular_tokens_mask"]).float()
+        )
+
+        return (
+            compact_tensors_batch[:, mask_remove_unnecessary_padding, :],
+            compact_dict,
+            compression_rate,
+        )
 
     def initialize_padding_tensor_like(self, tensor):
         # this function should be better, like initialize randomly from a distribution, because

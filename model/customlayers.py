@@ -29,21 +29,20 @@ class Attention(nn.Module):
          torch.Size([5, 1, 5])
     """
 
-    def __init__(self, dimensions, attention_type='general'):
+    def __init__(self, dimensions, attention_type="general"):
         super(Attention, self).__init__()
 
-        if attention_type not in ['dot', 'general']:
-            raise ValueError('Invalid attention type selected.')
+        if attention_type not in ["dot", "general"]:
+            raise ValueError("Invalid attention type selected.")
 
         self.attention_type = attention_type
-        if self.attention_type == 'general':
+        if self.attention_type == "general":
             self.linear_in = nn.Linear(dimensions, dimensions, bias=False)
 
         self.linear_out = nn.Linear(dimensions * 2, dimensions, bias=False)
         self.softmax = nn.Softmax(dim=-1)
         self.tanh = nn.Tanh()
 
-    
     def forward(self, query, context):
         """
         Args:

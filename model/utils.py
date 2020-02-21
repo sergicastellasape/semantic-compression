@@ -10,51 +10,77 @@ import torch
 from torch.nn.utils.rnn import PackedSequence
 
 
-def eval_model_on_DF(model, dataframes_dict, get_batch_function_dict, batch_size=16, global_counter=0, compression=None, device=torch.device('cpu')):
+def eval_model_on_DF(
+    model,
+    dataframes_dict,
+    get_batch_function_dict,
+    batch_size=16,
+    global_counter=0,
+    compression=None,
+    return_comp_rate=False,
+    device=torch.device("cpu"),
+):
+
     assert compression is not None
-    k=0
-    metrics_dict = {}
+    metrics_dict, compression_dict, k = {}, {}, 0
     with torch.no_grad():
         for dataset, df in dataframes_dict.items():
-            n_batches = math.floor(len(df)/batch_size)
-            batch_splits = [-1]*(len(dataframes_dict)+1)
-            batch_splits[k] = 0 # [-1, -1, 0, -1, -1]
-            batch_splits[k+1] = batch_size + 1  #len(df) # [-1, -1, 0, 32400, -1]
-            dev_acc = 0
+            n_batches = math.floor(len(df) / batch_size)
+            batch_splits = [-1] * (len(dataframes_dict) + 1)
+            batch_splits[k] = 0  # [-1, -1, 0, -1, -1]
+            batch_splits[k + 1] = batch_size + 1  # len(df) # [-1, -1, 0, 32400, -1]
+            dev_acc, cummulative_comp = 0, 0
             for i in range(n_batches):
                 batch_targets, batch_sequences = [], []
-                indices = list(range(i*batch_size, (i+1)*batch_size))
+                indices = list(range(i * batch_size, (i + 1) * batch_size))
                 dataset_batch = get_batch_function_dict[dataset](df, indices)
                 # construct targets
-                batch_targets.append(torch.tensor([data[1] for data in dataset_batch],
-                                                dtype=torch.int64,
-                                                device=device))
+                batch_targets.append(
+                    torch.tensor(
+                        [data[1] for data in dataset_batch],
+                        dtype=torch.int64,
+                        device=device,
+                    )
+                )
                 # construct sequences
                 batch_sequences.extend([data[0] for data in dataset_batch])
-                batch_predictions = model.forward(batch_sequences, batch_splits=batch_splits, compression=compression)
+                batch_predictions, compression = model.forward(
+                    batch_sequences,
+                    batch_splits=batch_splits,
+                    compression=compression,
+                    return_comp_rate=return_comp_rate,
+                )
                 L = model.loss(batch_predictions, batch_targets, weights=None)
                 m = model.metrics(batch_predictions, batch_targets)
                 dev_acc += m[0]
+                cummulative_comp += compression
             k += 1
-            acc = dev_acc/n_batches
+            acc = dev_acc / n_batches
+            comp = cummulative_comp / n_batches
             metrics_dict[dataset] = acc
+            compression_dict[dataset] = comp.item()
 
-    return metrics_dict
+    if return_comp_rate:
+        return metrics_dict, compression_dict
+    else:
+        return metrics_dict
 
 
 def make_connectivity_matrix(length):
     col, row = [], []
-    for i in range(length-1):
-        col.extend([i, i+1])
-        row.extend([i+1, i])
-    data = np.ones(length*2-2, dtype=int)
-    connectivity_matrix = scipy.sparse.coo_matrix((data, (row, col)), shape=(length, length)).toarray()
+    for i in range(length - 1):
+        col.extend([i, i + 1])
+        row.extend([i + 1, i])
+    data = np.ones(length * 2 - 2, dtype=int)
+    connectivity_matrix = scipy.sparse.coo_matrix(
+        (data, (row, col)), shape=(length, length)
+    ).toarray()
     return connectivity_matrix
 
 
 def add_space_to_special_characters(string, characters=[]):
     for char in characters:
-        string = string.replace(char, f' {char} ')
+        string = string.replace(char, f" {char} ")
     return string
 
 
@@ -83,11 +109,11 @@ def expand_indices(indices_batch, target_lengths):
 
             while indices_batch[b][0][0] > 0:
                 first_idx = indices_batch[b][0][0]
-                indices_batch[b].insert(0, (first_idx-1,))
+                indices_batch[b].insert(0, (first_idx - 1,))
 
             while indices_batch[b][-1][-1] < target_length - 1:
                 last_idx = indices_batch[b][-1][-1]
-                indices_batch[b].append((last_idx+1,))
+                indices_batch[b].append((last_idx + 1,))
 
     return indices_batch
 
@@ -97,21 +123,22 @@ def time_since(t, message):
     print(message, time.time() - t)
 
 
-
 def txt2list(txt_path=None):
     """
     Load txt file and split the sentences into a list of strings
     """
     if txt_path is None:
-        raise ValueError("txt_path must be specified as a named argument! \
-        E.g. txt_path='../dataset/yourfile.txt'")
+        raise ValueError(
+            "txt_path must be specified as a named argument! \
+        E.g. txt_path='../dataset/yourfile.txt'"
+        )
 
     # Read input sequences from .txt file and put them in a list
     with open(txt_path) as f:
         text = f.read()
-    sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
+    sentences = re.split(r"(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s", text)
     try:
-        sentences.remove('') # remove possible empty strings
+        sentences.remove("")  # remove possible empty strings
     except:
         None
 
@@ -120,14 +147,20 @@ def txt2list(txt_path=None):
 
 def abs_max_pooling(T, dim=1):
     # input is (batch, seq_length, emb_dimension)
-    _, abs_max_i = torch.max(T.abs(), dim=dim) #max over abs in sequence dimension
+    _, abs_max_i = torch.max(T.abs(), dim=dim)  # max over abs in sequence dimension
     # convert indices into one_hot vectors
-    one_hot = torch.nn.functional.one_hot(abs_max_i, num_classes=T.size()[dim]).transpose(dim, -1).type(torch.float)
+    one_hot = (
+        torch.nn.functional.one_hot(abs_max_i, num_classes=T.size()[dim])
+        .transpose(dim, -1)
+        .type(torch.float)
+    )
     # multily original with one hot to apply mask and then sum over the dimension
     max_abs_tensor = torch.mul(T, one_hot).sum(dim=dim)
     return max_abs_tensor
 
-#torch.set_default_tensor_type(torch.cuda.FloatTensor)
+
+# torch.set_default_tensor_type(torch.cuda.FloatTensor)
+
 
 def hotfix_pack_padded_sequence(inp, lengths, batch_first=False, enforce_sorted=True):
     lengths = torch.as_tensor(lengths, dtype=torch.int64)
@@ -140,6 +173,7 @@ def hotfix_pack_padded_sequence(inp, lengths, batch_first=False, enforce_sorted=
         batch_dim = 0 if batch_first else 1
         inp = inp.index_select(batch_dim, sorted_indices)
 
-    data, batch_sizes = \
-        torch._C._VariableFunctions._pack_padded_sequence(inp, lengths, batch_first)
+    data, batch_sizes = torch._C._VariableFunctions._pack_padded_sequence(
+        inp, lengths, batch_first
+    )
     return PackedSequence(data, batch_sizes, sorted_indices)

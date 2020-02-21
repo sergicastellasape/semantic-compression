@@ -6,17 +6,21 @@ operate "in parallel"
 import torch.nn as nn
 import torch
 
+
 class End2EndModel(nn.Module):
     """
     End2EndModel docstring
     """
-    def __init__(self, 
-                 transformer, 
-                 bracketer, 
-                 generator, 
-                 multitasknet, 
-                 trainable_modules = ['multitasknet', 'generator'],
-                 device = torch.device('cpu')):
+
+    def __init__(
+        self,
+        transformer,
+        bracketer,
+        generator,
+        multitasknet,
+        trainable_modules=["multitasknet", "generator"],
+        device=torch.device("cpu"),
+    ):
         super().__init__()
 
         self.device = device
@@ -25,24 +29,47 @@ class End2EndModel(nn.Module):
         self.generator = generator
         self.multitasknet = multitasknet
         self.trainable_modules = trainable_modules  # not implemented yet
-     
-    def forward(self, sequences_batch, batch_splits=None, compression=None):
+
+    def forward(
+        self,
+        sequences_batch,
+        batch_splits=None,
+        compression=None,
+        return_comp_rate=False,
+    ):
         assert compression is not None
         assert batch_splits is not None
-        context_representation, masks_dict = self.transformer.forward(sequences_batch, return_masks=True)
+        context_representation, masks_dict = self.transformer.forward(
+            sequences_batch, return_masks=True
+        )
 
         if compression:
-            indices = self.bracketer.forward(context_representation, masks_dict=masks_dict)
-            compact_representation, compact_masks_dict = self.generator.forward(context_representation, 
-                                                                                indices, 
-                                                                                masks_dict=masks_dict)
+            indices = self.bracketer.forward(
+                context_representation, masks_dict=masks_dict
+            )
+            (
+                compact_representation,
+                compact_masks_dict,
+                comp_rate,
+            ) = self.generator.forward(
+                context_representation, indices, masks_dict=masks_dict
+            )
         else:
-            compact_representation, compact_masks_dict = context_representation, masks_dict
+            comp_rate = 1
+            compact_representation, compact_masks_dict = (
+                context_representation,
+                masks_dict,
+            )
 
-        output = self.multitasknet.forward(compact_representation,
-                                           batch_splits=batch_splits,
-                                           masks_dict=compact_masks_dict)
-        return output # list of tensors, each tensor is the model prediction for each task
+        output = self.multitasknet.forward(
+            compact_representation,
+            batch_splits=batch_splits,
+            masks_dict=compact_masks_dict,
+        )
+        if return_comp_rate:
+            return output, comp_rate
+        else:
+            return output  # list of tensors, each tensor is the model prediction for each task
 
     def loss(self, batch_prediction, batch_targets, weights=None):
         return self.multitasknet.loss(batch_prediction, batch_targets, weights=weights)
@@ -55,10 +82,8 @@ class MultiTaskNet(nn.Module):
     """
     MultiTaskNet docstring
     """
-    def __init__(self,
-                 *task_networks,
-                 device=torch.device('cpu'),
-                 config={}):
+
+    def __init__(self, *task_networks, device=torch.device("cpu"), config={}):
         super(MultiTaskNet, self).__init__()
 
         self.device = device
@@ -70,11 +95,13 @@ class MultiTaskNet(nn.Module):
         assert masks_dict is not None
         output = []
         # eventually this could be parallelized because there's no sequential
-        # dependency, but makes the implementation more complex, given that the 
+        # dependency, but makes the implementation more complex, given that the
         # input for each parallel net is different
         for i, task_net in enumerate(self.parallel_net_list):
-            inp_split = input[batch_splits[i]:batch_splits[i+1], :, :]
-            seq_pair_mask = masks_dict['seq_pair_mask'][batch_splits[i]:batch_splits[i+1], :]
+            inp_split = input[batch_splits[i] : batch_splits[i + 1], :, :]
+            seq_pair_mask = masks_dict["seq_pair_mask"][
+                batch_splits[i] : batch_splits[i + 1], :
+            ]
             if inp_split.size(0) > 0:
                 output.append(task_net.forward(inp_split, seq_pair_mask=seq_pair_mask))
 
@@ -82,11 +109,15 @@ class MultiTaskNet(nn.Module):
 
     def loss(self, predictions, targets, weights=None):
         losses = []
-        for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
-            # unsqeeze so the size is (1,) and they can be concatenated, 
+        for network, prediction, target in zip(
+            self.parallel_net_list, predictions, targets
+        ):
+            # unsqeeze so the size is (1,) and they can be concatenated,
             # otherwise torch.cat doesn't work for scalar tensors (zero dimensions)
-            if prediction.size(0) > 0:  # skip if empty model outputs to avoid 'empty tensor' errors 
-                losses.append(network.loss(prediction, target).unsqueeze(0)) 
+            if (
+                prediction.size(0) > 0
+            ):  # skip if empty model outputs to avoid 'empty tensor' errors
+                losses.append(network.loss(prediction, target).unsqueeze(0))
 
         loss = torch.cat(losses, dim=0)
         if weights is None:
@@ -99,9 +130,11 @@ class MultiTaskNet(nn.Module):
 
     def metrics(self, predictions, targets):
         metrics = []
-        for network, prediction, target in zip(self.parallel_net_list, predictions, targets):
+        for network, prediction, target in zip(
+            self.parallel_net_list, predictions, targets
+        ):
             if prediction.size(0) > 0:
                 correct = torch.argmax(prediction, dim=1) == target
                 metrics.append(int(correct.sum()) / len(correct))
-    
+
         return metrics
