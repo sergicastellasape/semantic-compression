@@ -6,7 +6,8 @@ import torch
 # Given a list of indices and a Quora Question Pairs dataset this returns
 # a list of tuples (question1, question2, is_duplicate)
 def get_batch_QQP_from_indices(dataframe, batch_indices, max_char_length=300):
-
+    # truncate to max character length to avoid memory problems, the maximum
+    # character lenght in the dataset is around 1.1k and the average is ~60
     q1 = (
         dataframe.iloc[batch_indices]["question1"]
         .str.slice(0, max_char_length)

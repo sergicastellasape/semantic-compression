@@ -28,7 +28,8 @@ def eval_model_on_DF(
             n_batches = math.floor(len(df) / batch_size)
             batch_splits = [-1] * (len(dataframes_dict) + 1)
             batch_splits[k] = 0  # [-1, -1, 0, -1, -1]
-            batch_splits[k + 1] = batch_size + 1  # len(df) # [-1, -1, 0, 32400, -1]
+            # len(df) # [-1, -1, 0, 32400, -1]
+            batch_splits[k + 1] = batch_size + 1
             dev_acc, cummulative_comp = 0, 0
             for i in range(n_batches):
                 batch_targets, batch_sequences = [], []
@@ -139,15 +140,16 @@ def txt2list(txt_path=None):
     sentences = re.split(r"(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s", text)
     try:
         sentences.remove("")  # remove possible empty strings
-    except:
-        None
+    except Exception as error:
+        raise Exception('something went wrong dude.')
 
     return sentences
 
 
 def abs_max_pooling(T, dim=1):
     # input is (batch, seq_length, emb_dimension)
-    _, abs_max_i = torch.max(T.abs(), dim=dim)  # max over abs in sequence dimension
+    # max over abs in sequence dimension
+    _, abs_max_i = torch.max(T.abs(), dim=dim)
     # convert indices into one_hot vectors
     one_hot = (
         torch.nn.functional.one_hot(abs_max_i, num_classes=T.size()[dim])

@@ -98,12 +98,13 @@ class MultiTaskNet(nn.Module):
         # dependency, but makes the implementation more complex, given that the
         # input for each parallel net is different
         for i, task_net in enumerate(self.parallel_net_list):
-            inp_split = input[batch_splits[i] : batch_splits[i + 1], :, :]
+            inp_split = input[batch_splits[i]:batch_splits[i + 1], :, :]
             seq_pair_mask = masks_dict["seq_pair_mask"][
-                batch_splits[i] : batch_splits[i + 1], :
+                batch_splits[i]:batch_splits[i + 1], :
             ]
             if inp_split.size(0) > 0:
-                output.append(task_net.forward(inp_split, seq_pair_mask=seq_pair_mask))
+                output.append(task_net.forward(
+                    inp_split, seq_pair_mask=seq_pair_mask))
 
         return output
 

@@ -1,38 +1,50 @@
+# Generic
+import argparse
+import yaml
+import time
+import gc
+import datetime
+import os
 import sys
 
-sys.path.append(
-    "."
-)  # Add parent directory to sys path to enable to imports from the root dir
-import os
-import datetime
+# Data & Math
 import math
-import gc
-import time
 import pandas as pd
-import yaml
 import torch
 from torch.utils.tensorboard import SummaryWriter
-import argparse
+
+# Transformers
 from transformers import BertModel, BertTokenizer
 
 # Custom imports
-from model.utils import *
-from model.data_utils import get_batch_SST2_from_indices, get_batch_QQP_from_indices
-from model.transformer import Transformer
-from model.bracketing import (
-    IdentityChunker,
-    NNSimilarityChunker,
-    AgglomerativeClusteringChunker,
-    cos,
-)
-from model.generators import IdentityGenerator, EmbeddingGenerator
+sys.path.append(".")  # Add parent directory to sys.path to import from root dir
+from model.model import MultiTaskNet, End2EndModel
 from model.classifiers import (
     AttentionClassifier,
     SeqPairAttentionClassifier,
     NaivePoolingClassifier,
     SeqPairFancyClassifier,
 )
-from model.model import MultiTaskNet, End2EndModel
+from model.generators import IdentityGenerator, EmbeddingGenerator
+from model.bracketing import (
+    IdentityChunker,
+    NNSimilarityChunker,
+    AgglomerativeClusteringChunker,
+    cos,
+)
+from model.transformer import Transformer
+from model.data_utils import get_batch_SST2_from_indices, get_batch_QQP_from_indices
+from model.utils import (
+    eval_model_on_DF,
+    make_connectivity_matrix,
+    add_space_to_special_characters,
+    filter_indices,
+    expand_indices,
+    time_since,
+    txt2list,
+    abs_max_pooling,
+    hotfix_pack_padded_sequence
+)
 
 
 parser = argparse.ArgumentParser(description="Model Options")
@@ -148,12 +160,14 @@ dataframes = {}
 for dataset in config["datasets"]:
     dataframes[dataset] = {}
     for kind in ["train", "test", "dev"]:
-        dataframes[dataset][kind] = pd.read_csv(config[dataset]["path"][kind], sep="\t")
+        dataframes[dataset][kind] = pd.read_csv(
+            config[dataset]["path"][kind], sep="\t")
 
 
-###############################################################################
-############################### LOAD MODELS ###################################
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+#############################################################################
+############################### LOAD MODELS #################################
+device = torch.device(
+    "cuda") if torch.cuda.is_available() else torch.device("cpu")
 print(f"Device being used: {device}")
 
 transformer_net = Transformer(
@@ -182,40 +196,35 @@ elif args.chunker == "agglomerative":
 else:
     raise ValueError("You must pass a valid chunker as an argument!")
 
-generator_net = EmbeddingGenerator(pool_function=abs_max_pooling, device=device)
+generator_net = EmbeddingGenerator(pool_function=abs_max_pooling,
+                                   device=device)
 
-seq_classifier = AttentionClassifier(
-    embedding_dim=768,
-    sentset_size=2,
-    dropout=0.3,
-    n_sentiments=4,
-    pool_mode="concat",
-    device=device,
-).to(device)
+seq_classifier = AttentionClassifier(embedding_dim=768,
+                                     sentset_size=2,
+                                     dropout=0.3,
+                                     n_sentiments=4,
+                                     pool_mode="concat",
+                                     device=device).to(device)
 
-seq_pair_classifier = SeqPairFancyClassifier(
-    embedding_dim=768, num_classes=2, dropout=0.3, n_attention_vecs=2, device=device
-)  # .to(device)
+seq_pair_classifier = SeqPairFancyClassifier(embedding_dim=768,
+                                             num_classes=2,
+                                             dropout=0.3,
+                                             n_attention_vecs=2,
+                                             device=device).to(device)
 
-naive_classifier = NaivePoolingClassifier(
-    embedding_dim=768,
-    num_classes=2,
-    dropout=0.0,
-    pool_mode="max_pooling",
-    device=device,
-).to(device)
+naive_classifier = NaivePoolingClassifier(embedding_dim=768,
+                                          num_classes=2,
+                                          dropout=0.0,
+                                          pool_mode="max_pooling",
+                                          device=device).to(device)
 
-multitask_net = MultiTaskNet(seq_classifier, seq_pair_classifier, device=device).to(
-    device
-)
+multitask_net = MultiTaskNet(seq_classifier, seq_pair_classifier, device=device).to(device)
 
-model = End2EndModel(
-    transformer=transformer_net,
-    bracketer=bracketing_net,
-    generator=generator_net,
-    multitasknet=multitask_net,
-    device=device,
-).to(device)
+model = End2EndModel(transformer=transformer_net,
+                     bracketer=bracketing_net,
+                     generator=generator_net,
+                     multitasknet=multitask_net,
+                     device=device).to(device)
 
 
 ##########################################################################
@@ -229,15 +238,19 @@ eval_periodicity = args.evalperiod
 writer = SummaryWriter(
     log_dir=os.path.join(LOG_DIR, run_identifier), comment=args.tensorboard_comment
 )
-checkpoints_path = os.path.join("./assets/checkpoints/", f"{run_identifier}.pt")
+checkpoints_path = os.path.join(
+    "./assets/checkpoints/", f"{run_identifier}.pt")
 if args.load_checkpoint:
     model.load_state_dict(torch.load(checkpoints_path))
 
 # LOAD CONFIG DICTS AND CREATE NEW ONES FROM THOSE
-counter = {dataset: config[dataset]["counter"] for dataset in config["datasets"]}
-batch_size = {dataset: config[dataset]["batch_size"] for dataset in config["datasets"]}
+counter = {dataset: config[dataset]["counter"]
+           for dataset in config["datasets"]}
+batch_size = {dataset: config[dataset]["batch_size"]
+              for dataset in config["datasets"]}
 n_batches = {
-    dataset: math.floor(len(dataframes[dataset]["train"]) / batch_size[dataset])
+    dataset: math.floor(
+        len(dataframes[dataset]["train"]) / batch_size[dataset])
     for dataset in config["datasets"]
 }
 get_batch_function = {
@@ -295,9 +308,9 @@ while not finished_training:
                     device=device,
                 )
             )
-        except:
+        except Exception as error:
             L = [data[1] for data in dataset_batch]
-            raise ValueError(
+            raise Exception(
                 f"This thing failed when the target tensor was in dataset \
                               {dataset}: {L}, indices: {batch_indices[dataset][idx, :]}"
             )
@@ -325,7 +338,7 @@ while not finished_training:
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
         print(f"Iterations per second: {eval_periodicity/(time.time()-t)}")
-        ###################### evaluate on dev sets
+        # evaluate on dev sets
         model.eval()
         metrics_dict, compression_dict = eval_model_on_DF(
             model,
@@ -357,13 +370,15 @@ while not finished_training:
     writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_counter)
     writer.add_scalars(
         f"metrics/train/{run_identifier}",
-        {config["datasets"][i]: metrics[i] for i in range(len(config["datasets"]))},
+        {config["datasets"][i]: metrics[i]
+            for i in range(len(config["datasets"]))},
         global_counter,
     )
 
     global_counter += 1
 
-    finished_training = True if (time.time() - initial_time) > args.walltime else False
+    finished_training = True if (
+        time.time() - initial_time) > args.walltime else False
 
 print("########## FINAL EVAL ON FULL TEST SET #############")
 # load best checkpoint

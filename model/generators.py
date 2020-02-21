@@ -15,7 +15,7 @@ class EmbeddingGenerator:
             _ = pool_function(t)
             self.pool_function = pool_function
             self.device = device
-        except:
+        except Exception as error:
             raise ValueError("The pool_function seems to not work!")
 
     def forward(self, input_tensors, indices, masks_dict=None):
@@ -32,7 +32,8 @@ class EmbeddingGenerator:
         # indices batch: list of lists of tuples
         # [[(0,), (1,), (2, 3, 4), (5,), (6,)], [(etc.)]]
 
-        compact_tensors_batch = self.initialize_padding_tensor_like(tensors_batch)
+        compact_tensors_batch = self.initialize_padding_tensor_like(
+            tensors_batch)
 
         # as all are zeros, this starts as an all false boolean mask
         batch_size, max_len, _ = tensors_batch.size()
@@ -51,7 +52,8 @@ class EmbeddingGenerator:
             for i, idx_tuple in enumerate(chunk_indices):
                 # for each group calculate the compacted with "pool_function" (which will eventually
                 # be something more complex, not just max pooling)
-                joint = self.pool_function(tensors_batch[b, idx_tuple, :].unsqueeze(0))
+                joint = self.pool_function(
+                    tensors_batch[b, idx_tuple, :].unsqueeze(0))
                 compact_tensors_batch[b, i, :] = joint
 
                 # update compact masks
@@ -83,8 +85,8 @@ class EmbeddingGenerator:
         }
 
         compression_rate = (
-            torch.sum(compact_dict["regular_tokens_mask"]).float()
-            / torch.sum(masks_dict["regular_tokens_mask"]).float()
+            torch.sum(compact_dict["regular_tokens_mask"]).float() /
+            torch.sum(masks_dict["regular_tokens_mask"]).float()
         )
 
         return (
