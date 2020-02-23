@@ -3,6 +3,7 @@ Collection of useful little functions.
 """
 import re
 import time
+from tqdm import tqdm
 import math
 import numpy as np
 import scipy
@@ -31,7 +32,7 @@ def eval_model_on_DF(
             # len(df) # [-1, -1, 0, 32400, -1]
             batch_splits[k + 1] = batch_size + 1
             dev_acc, cummulative_comp = 0, 0
-            for i in range(n_batches):
+            for i in tqdm(range(n_batches), desc=f'Progress on {dataset}'):
                 batch_targets, batch_sequences = [], []
                 indices = list(range(i * batch_size, (i + 1) * batch_size))
                 dataset_batch = get_batch_function_dict[dataset](df, indices)
@@ -45,7 +46,7 @@ def eval_model_on_DF(
                 )
                 # construct sequences
                 batch_sequences.extend([data[0] for data in dataset_batch])
-                batch_predictions, compression = model.forward(
+                batch_predictions, compression_rate = model.forward(
                     batch_sequences,
                     batch_splits=batch_splits,
                     compression=compression,
@@ -54,12 +55,12 @@ def eval_model_on_DF(
                 L = model.loss(batch_predictions, batch_targets, weights=None)
                 m = model.metrics(batch_predictions, batch_targets)
                 dev_acc += m[0]
-                cummulative_comp += compression
+                cummulative_comp += compression_rate
             k += 1
             acc = dev_acc / n_batches
             comp = cummulative_comp / n_batches
             metrics_dict[dataset] = acc
-            compression_dict[dataset] = comp.item()
+            compression_dict[dataset] = comp
 
     if return_comp_rate:
         return metrics_dict, compression_dict

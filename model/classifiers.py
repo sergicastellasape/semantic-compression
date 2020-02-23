@@ -180,17 +180,29 @@ class AttentionClassifier(nn.Module):
         sentiment_logscore = F.log_softmax(sentiment, dim=1)
         return sentiment_logscore
 
+"""
+class ConvAttentionClassifier(nn.Module):
+    def __init__(self,
+                 embedding_dim,
+                 num_classes,
+                 dropout=0.0,
+                 n_attention_vecs=2,
+                 device=torch.device("cpu")):
+        super()__init__()
+        self.device = device
+
+        self.conv1d = nn.Conv2d(1, 1, (embedding_dim, 3), )
+"""
+
 
 class SeqPairAttentionClassifier(nn.Module):
-    def __init__(
-        self,
-        embedding_dim,
-        num_classes,
-        dropout=0.0,
-        n_attention_vecs=4,
-        pool_mode="concat",
-        device=torch.device("cpu"),
-    ):
+    def __init__(self,
+                 embedding_dim,
+                 num_classes,
+                 dropout=0.0,
+                 n_attention_vecs=4,
+                 pool_mode="concat",
+                 device=torch.device("cpu")):
         super(SeqPairAttentionClassifier, self).__init__()
 
         self.device = device

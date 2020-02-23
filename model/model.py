@@ -37,7 +37,8 @@ class End2EndModel(nn.Module):
         compression=None,
         return_comp_rate=False,
     ):
-        assert compression is not None
+
+        assert compression in [True, False]
         assert batch_splits is not None
         context_representation, masks_dict = self.transformer.forward(
             sequences_batch, return_masks=True

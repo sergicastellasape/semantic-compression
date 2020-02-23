@@ -46,6 +46,19 @@ from model.utils import (
     hotfix_pack_padded_sequence
 )
 
+def str2bool(v):
+    """
+    To pass True or False boolean arguments
+    in argparse. Code from stackoverflow.
+    """
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 parser = argparse.ArgumentParser(description="Model Options")
 parser.add_argument(
@@ -127,7 +140,7 @@ parser.add_argument(
     "--train-compression",
     "-tc",
     required=True,
-    type=bool,
+    type=str2bool,
     dest="train_comp",
     help="set if compression happens during training, True or False",
 )
@@ -135,7 +148,7 @@ parser.add_argument(
     "--eval-compression",
     "-ec",
     required=True,
-    type=bool,
+    type=str2bool,
     dest="eval_comp",
     help="set if compression happens during evaluation, True or False",
 )
@@ -282,6 +295,7 @@ optimizer = torch.optim.Adam(
 finished_training = False
 t = time.time()
 while not finished_training:
+    # Reset counter for dataset if it's been finished
     for dataset in config["datasets"]:
         if counter[dataset] >= n_batches[dataset] or global_counter == 0:
             print(f"NEW EPOCH STARTED FOR DATASET {dataset}!")
@@ -293,6 +307,7 @@ while not finished_training:
                 n_batches[dataset] * batch_size[dataset], device=torch.device("cpu")
             ).reshape(-1, batch_size[dataset])
 
+    # Generate new batch
     batch_sequences, batch_targets, batch_splits = [], [], [0]
     for dataset in config["datasets"]:
         idx = counter[dataset]
@@ -321,10 +336,12 @@ while not finished_training:
         batch_splits.append(batch_splits[-1] + len(dataset_batch))
         counter[dataset] += 1
 
+    # Forward pass
     model.train()
-    batch_predictions = model.forward(
-        batch_sequences, batch_splits=batch_splits, compression=args.train_comp
-    )
+    batch_predictions = model.forward(batch_sequences,
+                                      batch_splits=batch_splits,
+                                      compression=args.train_comp,
+                                      return_comp_rate=False)
     L = model.loss(batch_predictions, batch_targets, weights=None)
     metrics = model.metrics(batch_predictions, batch_targets)
     # Update net
@@ -394,3 +411,5 @@ metrics_dict, compression_dict = eval_model_on_DF(
     return_comp_rate=True,
     device=device,
 )
+print("Full test set losses: ", metrics_dict)
+writer.add_scalars(f"metrics/test/{run_identifier}", metrics_dict, 0)
