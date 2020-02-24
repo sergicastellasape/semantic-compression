@@ -89,16 +89,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--tensorboard-dir",
-    "-tbdir",
-    dest="log_dir",
-    type=str,
-    required=False,
-    default="./tensorboard",
-    help="rood directory where tensorboard logs are stored. ./tensorboard by default",
-)
-
-parser.add_argument(
     "--train-compression",
     "-tc",
     required=True,
@@ -118,10 +108,9 @@ parser.add_argument(
 
 
 args = parser.parse_args()
-if args.load_checkpoint:
-    assert os.path.exists(
-        f"./assets/checkpoints/{args.run_id}.pt"
-    ), "Checkpoint for run_id doesn't exist!"
+assert os.path.exists(
+    f"./assets/checkpoints/{args.run_id}.pt"
+), "Checkpoint for run_id doesn't exist!"
 
 # load config file from datasets
 with open("./config/datasets.yml", "r") as file:
@@ -211,8 +200,7 @@ run_identifier = args.run_id
 checkpoints_path = os.path.join(
     "./assets/checkpoints/", f"{run_identifier}.pt")
 print('checkpoints path', checkpoints_path)
-if args.load_checkpoint:
-    model.load_state_dict(torch.load(checkpoints_path, map_location=device))
+model.load_state_dict(torch.load(checkpoints_path, map_location=device))
 
 
 # LOAD CONFIG DICTS AND CREATE NEW ONES FROM THOSE
