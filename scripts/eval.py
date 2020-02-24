@@ -227,3 +227,4 @@ metrics_dict, compression_dict = eval_model_on_DF(
     device=device,
 )
 print("Full test set losses: ", metrics_dict)
+print("Compression on test sets:", compression_dict)
