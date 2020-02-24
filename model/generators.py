@@ -23,7 +23,7 @@ class EmbeddingGenerator:
         compact_representation, compact_masks_dict, compression_rate = self.generate(
             input_tensors, indices, masks_dict=masks_dict
         )
-        return compact_representation, compact_masks_dict, compression_rate
+        return compact_representation, compact_masks_dict, compression_rate.item()
 
     def generate(
         self, tensors_batch, indices_batch, masks_dict=None, return_comp_rate=False

@@ -161,9 +161,8 @@ def abs_max_pooling(T, dim=1):
     max_abs_tensor = torch.mul(T, one_hot).sum(dim=dim)
     return max_abs_tensor
 
-
-# torch.set_default_tensor_type(torch.cuda.FloatTensor)
-
+def mean_pooling(T, dim=1):
+    return T.mean(dim=1)
 
 def hotfix_pack_padded_sequence(inp, lengths, batch_first=False, enforce_sorted=True):
     lengths = torch.as_tensor(lengths, dtype=torch.int64)
