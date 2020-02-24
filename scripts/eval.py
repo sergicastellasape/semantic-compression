@@ -89,15 +89,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--train-compression",
-    "-tc",
-    required=True,
-    type=str2bool,
-    dest="train_comp",
-    help="set if compression happens during training, True or False",
-)
-
-parser.add_argument(
     "--eval-compression",
     "-ec",
     required=True,
