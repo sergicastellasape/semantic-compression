@@ -153,6 +153,16 @@ parser.add_argument(
     help="set if compression happens during evaluation, True or False",
 )
 
+parser.add_argument(
+    "--full-test-eval",
+    "-fev",
+    required=False,
+    default='False',
+    type=str2bool,
+    dest="full_test_eval",
+    help="Set if an evaluation on the full test set is made at the end.",
+)
+
 
 args = parser.parse_args()
 if args.load_checkpoint:
@@ -398,19 +408,20 @@ while not finished_training:
     finished_training = True if (
         time.time() - initial_time) > args.walltime else False
 
-print("########## FINAL EVAL ON FULL TEST SET #############")
-# load best checkpoint
-model.load_state_dict(torch.load(checkpoints_path))
-model.eval()
-metrics_dict, compression_dict = eval_model_on_DF(
-    model,
-    test_dataframes_dict,
-    get_batch_function,
-    batch_size=16,
-    global_counter=global_counter,
-    compression=args.eval_comp,
-    return_comp_rate=True,
-    device=device,
-)
-print("Full test set losses: ", metrics_dict)
-writer.add_scalars(f"metrics/test/{run_identifier}", metrics_dict, 0)
+if args.full_test_eval:
+    print("########## FINAL EVAL ON FULL TEST SET #############")
+    # load best checkpoint
+    model.load_state_dict(torch.load(checkpoints_path))
+    model.eval()
+    metrics_dict, compression_dict = eval_model_on_DF(
+        model,
+        test_dataframes_dict,
+        get_batch_function,
+        batch_size=16,
+        global_counter=global_counter,
+        compression=args.eval_comp,
+        return_comp_rate=True,
+        device=device,
+    )
+    print("Full test set losses: ", metrics_dict)
+    writer.add_scalars(f"metrics/test/{run_identifier}", metrics_dict, 0)
