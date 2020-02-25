@@ -4,7 +4,8 @@ assets/*
 # exception .gitkeep file
 !assets/.gitkeep
 
-
+# config for datasets
+config/datasets.yml
 
 
 .DS_Store
