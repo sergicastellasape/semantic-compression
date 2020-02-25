@@ -254,6 +254,7 @@ writer = SummaryWriter(
 checkpoints_path = os.path.join(
     "./assets/checkpoints/", f"{run_identifier}.pt")
 if args.load_checkpoint:
+    print(f'Loading checkpoint from {checkpoints_path}')
     model.load_state_dict(torch.load(checkpoints_path))
 
 # LOAD CONFIG DICTS AND CREATE NEW ONES FROM THOSE
