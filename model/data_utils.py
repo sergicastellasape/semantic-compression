@@ -39,6 +39,25 @@ def get_batch_SST2_from_indices(dataframe, batch_indices, max_char_length=None):
 
     return batch_review_sentiment
 
+def get_batch_WNLI_from_indices(dataframe, batch_indices, max_char_length=None):
+    s1 = (
+        dataframe.iloc[batch_indices]["sentence1"]
+        .str.slice(0, max_char_length)
+        .tolist()
+    )
+    s2 = (
+        dataframe.iloc[batch_indices]["sentence2"]
+        .str.slice(0, max_char_length)
+        .tolist()
+    )
+    label = dataframe.iloc[batch_indices]["label"].tolist()
+
+    batch_question_pair_label = []
+    for i in range(len(batch_indices)):
+        batch_question_pair_label.append(((s1[i], s2[i]), label[i]))
+
+    return batch_question_pair_label
+
 
 # THIS FOR IMDB DATASET: returns a list of
 def sentiment2tensorIMDB(sent_list):
