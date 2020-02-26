@@ -97,7 +97,6 @@ parser.add_argument(
     help="set if compression happens during evaluation, True or False",
 )
 
-
 args = parser.parse_args()
 assert os.path.exists(
     f"./assets/checkpoints/{args.run_id}.pt"
