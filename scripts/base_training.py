@@ -375,7 +375,7 @@ while not finished_training:
                                       return_comp_rate=False)
     L = model.loss(batch_predictions, batch_targets, weights=None)
     metrics = model.metrics(batch_predictions, batch_targets)
-    print('training metrics:', metrics)
+    # print('training metrics:', metrics)
     # Log to tensorboard
     writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_counter)
     writer.add_scalars(f"metrics/train/{run_identifier}", metrics, global_counter)
