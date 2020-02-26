@@ -60,6 +60,10 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+def str2list(string):
+    return [x.strip('[').strip(' ').strip(']')
+            for x in string.split(',')]
+
 parser = argparse.ArgumentParser(description="Model Options")
 parser.add_argument(
     "--run-identifier",
@@ -163,6 +167,16 @@ parser.add_argument(
     help="Set if an evaluation on the full test set is made at the end.",
 )
 
+parser.add_argument(
+    "--datasets",
+    "-dts",
+    required=False,
+    default='[SST2, QQP]',
+    type=str2list,
+    dest="datasets",
+    help="Set the datasets to train on.",
+)
+
 
 args = parser.parse_args()
 if args.load_checkpoint:
@@ -175,6 +189,7 @@ with open("./config/datasets.yml", "r") as file:
     config = yaml.load(file, Loader=yaml.Loader)
 with open("./config/model.yml", "r") as file:
     model_config = yaml.load(file, Loader=yaml.Loader)
+config["datasets"] = args.datasets
 
 #############################################################################
 ############################### LOAD DATASETS ###############################
