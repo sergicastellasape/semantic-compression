@@ -114,11 +114,13 @@ class AttentionClassifier(nn.Module):
         sentset_size,
         dropout=0.0,
         n_sentiments=2,
+        task=None,
         pool_mode="concat",
         device=torch.device("cpu"),
     ):
         super(AttentionClassifier, self).__init__()
-
+        assert task is not None
+        self.task = task
         self.device = device
         self.pool_mode = pool_mode
 
@@ -201,10 +203,12 @@ class SeqPairAttentionClassifier(nn.Module):
                  num_classes,
                  dropout=0.0,
                  n_attention_vecs=4,
+                 task=None,
                  pool_mode="concat",
                  device=torch.device("cpu")):
         super(SeqPairAttentionClassifier, self).__init__()
-
+        assert task is not None
+        self.task = task
         self.device = device
         self.pool_mode = pool_mode
 
@@ -285,11 +289,15 @@ class NaivePoolingClassifier(nn.Module):
         self,
         embedding_dim,
         num_classes,
+        task=None,
         dropout=0.0,
         pool_mode="max_pooling",
         device=torch.device("cpu"),
     ):
         super().__init__()
+        assert task is not None
+
+        self.task = task
         self.device = device
         self.pre_pooling_linear = nn.Linear(embedding_dim, embedding_dim)
         # network
@@ -316,12 +324,15 @@ class SeqPairFancyClassifier(nn.Module):
         self,
         embedding_dim,
         num_classes,
+        task=None,
         dropout=0.0,
         n_attention_vecs=4,
         device=torch.device("cpu"),
     ):
         super(SeqPairFancyClassifier, self).__init__()
+        assert task is not None
 
+        self.task = task
         self.device = device
 
         # Define attention layers:

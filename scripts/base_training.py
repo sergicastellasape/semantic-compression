@@ -239,6 +239,7 @@ generator_net = EmbeddingGenerator(pool_function=abs_max_pooling,
 
 seq_classifier = AttentionClassifier(embedding_dim=768,
                                      sentset_size=2,
+                                     task='SST2',
                                      dropout=0.3,
                                      n_sentiments=4,
                                      pool_mode="concat",
@@ -246,17 +247,22 @@ seq_classifier = AttentionClassifier(embedding_dim=768,
 
 seq_pair_classifier = SeqPairFancyClassifier(embedding_dim=768,
                                              num_classes=2,
+                                             task='QQP',
                                              dropout=0.3,
                                              n_attention_vecs=2,
                                              device=device).to(device)
 
-naive_classifier = NaivePoolingClassifier(embedding_dim=768,
-                                          num_classes=2,
-                                          dropout=0.0,
-                                          pool_mode="max_pooling",
-                                          device=device).to(device)
+seq_pair_classifier2 = SeqPairFancyClassifier(embedding_dim=768,
+                                              num_classes=3,
+                                              task='MNLI',
+                                              dropout=0.3,
+                                              n_attention_vecs=2,
+                                              device=device).to(device)
 
-multitask_net = MultiTaskNet(seq_classifier, seq_pair_classifier, device=device).to(device)
+multitask_net = MultiTaskNet(seq_classifier,
+                             seq_pair_classifier,
+                             seq_pair_classifier2,
+                             device=device).to(device)
 
 model = End2EndModel(transformer=transformer_net,
                      bracketer=bracketing_net,
@@ -264,6 +270,9 @@ model = End2EndModel(transformer=transformer_net,
                      multitasknet=multitask_net,
                      device=device).to(device)
 
+for dataset in config['datasets']:
+    assert dataset in model.multitasknet.parallel_net_dict.keys(), \
+        f"You forgot to add a model for task {dataset}"
 
 ##########################################################################
 ########################## DEFINE CONSTANTS ##############################
@@ -334,7 +343,7 @@ while not finished_training:
             ).reshape(-1, batch_size[dataset])
 
     # Generate new batch
-    batch_sequences, batch_targets, batch_splits = [], [], [0]
+    batch_sequences, batch_targets, batch_slices, j = [], {}, {}, 0
     for dataset in config["datasets"]:
         idx = counter[dataset]
         dataset_batch = get_batch_function[dataset](
@@ -342,13 +351,8 @@ while not finished_training:
         )
         # List of tensors, one for each task
         try:
-            batch_targets.append(
-                torch.tensor(
-                    [data[1] for data in dataset_batch],
-                    dtype=torch.int64,
-                    device=device,
-                )
-            )
+            batch_targets[dataset] = torch.tensor([data[1] for data in dataset_batch],
+                                                  dtype=torch.int64, device=device)
         except Exception as error:
             L = [data[1] for data in dataset_batch]
             raise Exception(
@@ -359,24 +363,28 @@ while not finished_training:
         # Big list combining the input sequences/ tuple of sequences because the batch needs
         # to be at the same "depth" level
         batch_sequences.extend([data[0] for data in dataset_batch])
-        batch_splits.append(batch_splits[-1] + len(dataset_batch))
+        batch_slices[dataset] = slice(j, j + len(dataset_batch))
+        j += len(dataset_batch)
         counter[dataset] += 1
 
     # Forward pass
     model.train()
     batch_predictions = model.forward(batch_sequences,
-                                      batch_splits=batch_splits,
+                                      batch_slices=batch_slices,
                                       compression=args.train_comp,
                                       return_comp_rate=False)
     L = model.loss(batch_predictions, batch_targets, weights=None)
     metrics = model.metrics(batch_predictions, batch_targets)
+    print('training metrics:', metrics)
+    # Log to tensorboard
+    writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_counter)
+    writer.add_scalars(f"metrics/train/{run_identifier}", metrics, global_counter)
     # Update net
     optimizer.zero_grad()
     L.backward()
     optimizer.step()
     batch_loss += L.item()
-
-    if global_counter % eval_periodicity == 0:
+    if (global_counter % eval_periodicity == 0) and (global_counter != 0):
         print(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
@@ -405,21 +413,8 @@ while not finished_training:
         print(f"Compression Rates:", compression_dict)
         batch_loss, t = 0, time.time()
         # Log to tensorboard
-        writer.add_scalars(
-            f"metrics/dev/{run_identifier}", metrics_dict, global_counter
-        )
-
-    # Log to tensorboard
-    writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_counter)
-    writer.add_scalars(
-        f"metrics/train/{run_identifier}",
-        {config["datasets"][i]: metrics[i]
-            for i in range(len(config["datasets"]))},
-        global_counter,
-    )
-
+        writer.add_scalars(f"metrics/dev/{run_identifier}", metrics_dict, global_counter)
     global_counter += 1
-
     finished_training = True if (
         time.time() - initial_time) > args.walltime else False
 
