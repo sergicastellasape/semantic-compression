@@ -40,7 +40,7 @@ def get_batch_SST2_from_indices(dataframe, batch_indices, max_char_length=None):
     return batch_review_sentiment
 
 
-def get_batch_MNLI_from_indices(dataframe, batch_indices, max_char_length=None):
+def get_batch_MNLI_from_indices(dataframe, batch_indices, max_char_length=600):
     s1 = (
         dataframe.iloc[batch_indices]["sentence1"]
         .str.slice(0, max_char_length)
