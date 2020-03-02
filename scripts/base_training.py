@@ -246,7 +246,7 @@ seq_pair_classifier2 = SeqPairFancyClassifier(embedding_dim=768,
 
 pooling_classifier = NaivePoolingClassifier(embedding_dim=768,
                                             num_classes=2,
-                                            task='QQP',
+                                            task='MNLI',
                                             dropout=0.03,
                                             device=device).to(device)
 
