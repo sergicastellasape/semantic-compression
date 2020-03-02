@@ -38,6 +38,8 @@ from model.utils import (
     eval_model_on_DF,
     make_connectivity_matrix,
     add_space_to_special_characters,
+    str2bool,
+    str2list,
     filter_indices,
     expand_indices,
     time_since,
@@ -45,24 +47,6 @@ from model.utils import (
     abs_max_pooling,
     hotfix_pack_padded_sequence
 )
-
-def str2bool(v):
-    """
-    To pass True or False boolean arguments
-    in argparse. Code from stackoverflow.
-    """
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
-
-def str2list(string):
-    return [x.strip('[').strip(' ').strip(']')
-            for x in string.split(',')]
 
 parser = argparse.ArgumentParser(description="Model Options")
 parser.add_argument(
@@ -189,6 +173,8 @@ with open("./config/datasets.yml", "r") as file:
     config = yaml.load(file, Loader=yaml.Loader)
 with open("./config/model.yml", "r") as file:
     model_config = yaml.load(file, Loader=yaml.Loader)
+
+# modify the datasets according to the arg passed
 config["datasets"] = args.datasets
 
 #############################################################################
@@ -200,7 +186,6 @@ for dataset in config["datasets"]:
     for kind in ["train", "test", "dev"]:
         dataframes[dataset][kind] = pd.read_csv(
             config[dataset]["path"][kind], sep="\t")
-
 
 #############################################################################
 ############################### LOAD MODELS #################################
@@ -223,7 +208,7 @@ if args.chunker == "NNSimilarity":
         threshold=args.sim_threshold,
         exclude_special_tokens=False,
         combinatorics="sequential",
-        chunk_size_limit=4,
+        chunk_size_limit=60,
         device=device,
     )
 elif args.chunker == "agglomerative":
@@ -259,9 +244,13 @@ seq_pair_classifier2 = SeqPairFancyClassifier(embedding_dim=768,
                                               n_attention_vecs=2,
                                               device=device).to(device)
 
-multitask_net = MultiTaskNet(seq_classifier,
-                             seq_pair_classifier,
-                             seq_pair_classifier2,
+pooling_classifier = NaivePoolingClassifier(embedding_dim=768,
+                                            num_classes=2,
+                                            task='QQP',
+                                            dropout=0.03,
+                                            device=device).to(device)
+
+multitask_net = MultiTaskNet(seq_pair_classifier2,
                              device=device).to(device)
 
 model = End2EndModel(transformer=transformer_net,

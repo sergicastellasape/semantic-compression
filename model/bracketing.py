@@ -48,11 +48,8 @@ class NNSimilarityChunker(nn.Module):
         self, batch_sequence_tensors, masks_dict=None
     ) -> List[List]:
         assert masks_dict is not None
-        (
-            batch_size,
-            seq_length,
-            _,
-        ) = batch_sequence_tensors.size()  # make sure the input is proper size!!
+        # make sure the input is proper size!!
+        batch_size, seq_length, _ = batch_sequence_tensors.size()
         indices = list(range(seq_length))
         regular_tokens_mask = masks_dict["regular_tokens_mask"]
 
@@ -62,7 +59,7 @@ class NNSimilarityChunker(nn.Module):
                 self.exclude_special_tokens
             ):  # don't use this, im not 100% sure it's correct
                 idx_combinations = [
-                    indices[s : e + 1]
+                    indices[s: e + 1]
                     for s, e in itertools.combinations(range(1, len(indices)), 2)
                 ]
             else:
@@ -118,7 +115,7 @@ class NNSimilarityChunker(nn.Module):
                     batch_all_indices_to_compact[b].append(indices)
 
         batch_indices_to_compact = batch_remove_subsets(batch_all_indices_to_compact)
-
+        #print(batch_indices_to_compact)
         return batch_indices_to_compact
 
 
@@ -130,26 +127,26 @@ class AgglomerativeClusteringChunker(nn.Module):
     def __init__(self, threshold=0.9, device=torch.device("cpu")):
         super().__init__()
         self.device = device
+        # agg clustering wants distance not similarity
         self.dist_threshold = 1 - threshold
         self.id = nn.Identity()
 
-    def forward(self, input, **kwargs):
-        _, length, _ = input.size()
-        connectivity_matrix = make_connectivity_matrix(length)
-        cl = cluster.AgglomerativeClustering(
-            n_clusters=None,
-            affinity="cosine",
-            memory=None,
-            connectivity=connectivity_matrix,
-            compute_full_tree=True,
-            linkage="average",
-            distance_threshold=self.dist_threshold,
-        )
+    def forward(self, input, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+        keep_non_padding = masks_dict['padding_mask'] == 1
         indices_to_compact = []
-        for embeddings in (
-            input.detach().cpu().numpy()
-        ):  # loop over each element in batch
-            N = cl.fit_predict(embeddings)
+        for b, embeddings in enumerate(input.detach().cpu().numpy()):  # loop over each element in batch
+            filtered_embedding = embeddings[keep_non_padding[b, :], :]
+            length, _ = filtered_embedding.shape
+            connectivity_matrix = make_connectivity_matrix(length)
+            cl = cluster.AgglomerativeClustering(n_clusters=None,
+                                                 affinity="cosine",
+                                                 memory=None,
+                                                 connectivity=connectivity_matrix,
+                                                 compute_full_tree=True,
+                                                 linkage="average",
+                                                 distance_threshold=self.dist_threshold)
+            N = cl.fit_predict(filtered_embedding)
             C = Counter(N)
             ordered_idx, i = [], 0
             for k, v in C.items():
@@ -160,11 +157,25 @@ class AgglomerativeClusteringChunker(nn.Module):
         return indices_to_compact
 
 
+class HardSpanChunker(nn.Module):
+    def __init__(self, span=None, device=torch.device('cpu')):
+        assert span is not None
+        self.device = device
+        self.id = nn.Identity()
+        self.span = span
+
+    def forward(self, input, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+        keep_non_padding = masks_dict['padding_mask'] == 1
+        lenghts = masks_dict['padding_mask']
+        indices_to_compact = None
+        return indices_to_compact
+
+
 class IdentityChunker(nn.Module):
     """
     IdentityChunker docstring
     """
-
     def __init__(self, *args, **kargs):
         super(IdentityChunker, self).__init__()
 

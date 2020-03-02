@@ -72,15 +72,11 @@ class EmbeddingGenerator:
 
         # To remove the dimensions in the sequence length where all the sequences are now padded because
         # of the compression
-        all_padding_elements = (
-            mask_padding.sum(dim=0) == 0
-        )  # True where ALL elements were kept unchanged
+        all_padding_elements = mask_padding.sum(dim=0) == 0  # True where ALL elements were kept unchanged
         mask_remove_unnecessary_padding = ~all_padding_elements
         compact_dict = {
             "paddig_mask": mask_padding[:, mask_remove_unnecessary_padding],
-            "regular_tokens_mask": mask_regular_tokens[
-                :, mask_remove_unnecessary_padding
-            ],
+            "regular_tokens_mask": mask_regular_tokens[:, mask_remove_unnecessary_padding],
             "seq_pair_mask": mask_seq_pair[:, mask_remove_unnecessary_padding],
         }
 

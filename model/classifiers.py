@@ -299,7 +299,7 @@ class NaivePoolingClassifier(nn.Module):
 
         self.task = task
         self.device = device
-        self.pre_pooling_linear = nn.Linear(embedding_dim, embedding_dim)
+        self.pre_pooling_linear = nn.Linear(embedding_dim, embedding_dim, bias=True)
         # network
         self.classifier = nn.Linear(embedding_dim, num_classes)
         self.log_softmax = nn.LogSoftmax(dim=1)
@@ -312,7 +312,7 @@ class NaivePoolingClassifier(nn.Module):
     def forward(self, input, **kwargs):
         # print('input classifier size', input.size())
         # input is size (batch, max_seq_length, embedding_dim)
-        inp = self.pre_pooling_linear(input, bias=False)
+        inp = self.pre_pooling_linear(input)
         pooled_features = abs_max_pooling(inp, dim=1)
         class_score = self.classifier(pooled_features)
         class_log_score = self.log_softmax(class_score)

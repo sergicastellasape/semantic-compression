@@ -50,7 +50,7 @@ def eval_model_on_DF(
                 )
                 L = model.loss(batch_predictions, batch_targets, weights=None)
                 m = model.metrics(batch_predictions, batch_targets)
-                dev_acc += m[0]
+                dev_acc += m[dataset]
                 cummulative_comp += compression_rate
             acc = dev_acc / n_batches
             comp = cummulative_comp / n_batches
@@ -156,8 +156,10 @@ def abs_max_pooling(T, dim=1):
     max_abs_tensor = torch.mul(T, one_hot).sum(dim=dim)
     return max_abs_tensor
 
+
 def mean_pooling(T, dim=1):
     return T.mean(dim=1)
+
 
 def hotfix_pack_padded_sequence(inp, lengths, batch_first=False, enforce_sorted=True):
     lengths = torch.as_tensor(lengths, dtype=torch.int64)
@@ -174,3 +176,23 @@ def hotfix_pack_padded_sequence(inp, lengths, batch_first=False, enforce_sorted=
         inp, lengths, batch_first
     )
     return PackedSequence(data, batch_sizes, sorted_indices)
+
+
+def str2bool(v):
+    """
+    To pass True or False boolean arguments
+    in argparse. Code from stackoverflow.
+    """
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def str2list(string):
+    return [x.strip('[').strip(' ').strip(']')
+            for x in string.split(',')]
