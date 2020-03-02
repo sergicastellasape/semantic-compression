@@ -245,9 +245,9 @@ seq_pair_classifier2 = SeqPairFancyClassifier(embedding_dim=768,
                                               device=device).to(device)
 
 pooling_classifier = NaivePoolingClassifier(embedding_dim=768,
-                                            num_classes=2,
+                                            num_classes=3,
                                             task='MNLI',
-                                            dropout=0.03,
+                                            dropout=0.3,
                                             device=device).to(device)
 
 multitask_net = MultiTaskNet(pooling_classifier,
