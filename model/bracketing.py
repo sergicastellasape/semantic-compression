@@ -133,7 +133,7 @@ class AgglomerativeClusteringChunker(nn.Module):
 
     def forward(self, input, masks_dict=None, **kwargs):
         assert masks_dict is not None
-        keep_non_padding = masks_dict['padding_mask'] == 1
+        keep_non_padding = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
         indices_to_compact = []
         for b, embeddings in enumerate(input.detach().cpu().numpy()):  # loop over each element in batch
             filtered_embedding = embeddings[keep_non_padding[b, :], :]
