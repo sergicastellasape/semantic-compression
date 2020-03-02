@@ -250,7 +250,7 @@ pooling_classifier = NaivePoolingClassifier(embedding_dim=768,
                                             dropout=0.03,
                                             device=device).to(device)
 
-multitask_net = MultiTaskNet(seq_pair_classifier2,
+multitask_net = MultiTaskNet(pooling_classifier,
                              device=device).to(device)
 
 model = End2EndModel(transformer=transformer_net,
