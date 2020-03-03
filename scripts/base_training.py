@@ -18,23 +18,14 @@ from transformers import BertModel, BertTokenizer
 
 # Custom imports
 sys.path.append(".")  # Add parent directory to sys.path to import from root dir
-from model.model import MultiTaskNet, End2EndModel
-from model.classifiers import (
-    AttentionClassifier,
-    SeqPairAttentionClassifier,
-    NaivePoolingClassifier,
-    SeqPairFancyClassifier,
-)
-from model.generators import IdentityGenerator, EmbeddingGenerator
-from model.bracketing import (
-    IdentityChunker,
-    NNSimilarityChunker,
-    AgglomerativeClusteringChunker,
-    HardSpanChunker,
-    cos,
-)
-from model.transformer import Transformer
-from model.data_utils import get_batch_SST2_from_indices, get_batch_QQP_from_indices
+from model.model import End2EndModel
+
+# Neural Network Builder functions
+from model.builder.transformer import make_transformer
+from model.builder.bracketing import make_bracketer
+from model.builder.multitask import make_multitask_net
+from model.builder.generators import make_generator
+
 from model.utils import (
     eval_model_on_DF,
     make_connectivity_matrix,
@@ -46,6 +37,7 @@ from model.utils import (
     time_since,
     txt2list,
     abs_max_pooling,
+    mean_pooling,
     hotfix_pack_padded_sequence
 )
 
@@ -85,6 +77,16 @@ parser.add_argument(
     required=True,
     choices=["NNSimilarity", "agglomerative", "hard"],
     help="Specify the bracketing part of the net",
+)
+
+parser.add_argument(
+    "--pooling",
+    dest="pooling",
+    type=str,
+    default="mean_pooling",
+    required=False,
+    choices=["abs_max_pooling", "mean_pooling"],
+    help="function to do the generation"
 )
 parser.add_argument(
     "--learning-rate",
@@ -205,69 +207,21 @@ device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
 print(f"Device being used: {device}")
 
-transformer_net = Transformer(
-    model_class=BertModel,
-    tokenizer_class=BertTokenizer,
-    pre_trained_weights="bert-base-uncased",
-    output_layer=-2,
-    device=device,
-)
+# Assign threshold if it was given in args
+sim_threshold = args.sim_threshold if args.sim_threshold != 666 else None
+span = args.span if args.span != 0 else None
 
-if args.chunker == 'NNSimilarity':
-    print("Using NNsimilarity chunker")
-    assert args.sim_threshold != 666, "Provide a valid threshold!"
-    bracketing_net = NNSimilarityChunker(sim_function=cos,
-                                         threshold=args.sim_threshold,
-                                         exclude_special_tokens=False,
-                                         combinatorics='sequential',
-                                         chunk_size_limit=60,
-                                         device=device)
-elif args.chunker == 'agglomerative':
-    print("Using AGGLOMERATIVE chunker")
-    assert args.sim_threshold != 666, "Provide a valid threshold!"
-    bracketing_net = AgglomerativeClusteringChunker(threshold=args.sim_threshold,
-                                                    device=device)
-elif args.chunker == 'hard':
-    print("Using HARD SPAN chunker")
-    assert args.span != 0, "Provide a valid span!"
-    bracketing_net = HardSpanChunker(span=args.span,
-                                     device=device)
-else:
-    raise ValueError("You must pass a valid chunker as an argument!")
-
-generator_net = EmbeddingGenerator(pool_function=abs_max_pooling,
+transformer_net = make_transformer(output_layer=-2,
                                    device=device)
-
-seq_classifier = AttentionClassifier(embedding_dim=768,
-                                     sentset_size=2,
-                                     task='SST2',
-                                     dropout=0.3,
-                                     n_sentiments=4,
-                                     pool_mode="concat",
-                                     device=device).to(device)
-
-seq_pair_classifier = SeqPairFancyClassifier(embedding_dim=768,
-                                             num_classes=2,
-                                             task='QQP',
-                                             dropout=0.3,
-                                             n_attention_vecs=2,
-                                             device=device).to(device)
-
-seq_pair_classifier2 = SeqPairFancyClassifier(embedding_dim=768,
-                                              num_classes=3,
-                                              task='MNLI',
-                                              dropout=0.3,
-                                              n_attention_vecs=2,
-                                              device=device).to(device)
-
-pooling_classifier = NaivePoolingClassifier(embedding_dim=768,
-                                            num_classes=3,
-                                            task='MNLI',
-                                            dropout=0.3,
-                                            device=device).to(device)
-
-multitask_net = MultiTaskNet(pooling_classifier,
-                             device=device).to(device)
+bracketing_net = make_bracketer(name=args.chunker,
+                                device=device,
+                                sim_threshold=sim_threshold,
+                                span=span)
+generator_net = make_generator(pooling=args.pooling,
+                               device=device)
+multitask_net = make_multitask_net(datasets=args.datasets,
+                                   config=config,
+                                   device=device)
 
 model = End2EndModel(transformer=transformer_net,
                      bracketer=bracketing_net,
@@ -275,9 +229,6 @@ model = End2EndModel(transformer=transformer_net,
                      multitasknet=multitask_net,
                      device=device).to(device)
 
-for dataset in config['datasets']:
-    assert dataset in model.multitasknet.parallel_net_dict.keys(), \
-        f"You forgot to add a model for task {dataset}"
 
 ##########################################################################
 ########################## DEFINE CONSTANTS ##############################
@@ -389,7 +340,7 @@ while not finished_training:
     L.backward()
     optimizer.step()
     batch_loss += L.item()
-    if (global_counter % eval_periodicity == 0) and (global_counter != 0):
+    if (global_counter % eval_periodicity == 0):  #and (global_counter != 0):
         print(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )

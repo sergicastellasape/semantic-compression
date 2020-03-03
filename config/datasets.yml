@@ -32,7 +32,7 @@ MNLI:
     test: './assets/datasets/MNLI/test.tsv'
     dev: './assets/datasets/MNLI/dev.tsv'
   batch_size: 16
-  classifier: 'SeqPairAttentionClassifier'
+  classifier: 'SeqPairFancyClassifier'
   get_batch_fn: !!python/name:model.data_utils.get_batch_MNLI_from_indices # Loads function object
   counter: 0
   num_classes: 3

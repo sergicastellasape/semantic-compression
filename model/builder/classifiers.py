@@ -39,27 +39,28 @@ def make_SeqPairAttentionClassifier(num_classes=None, task=None, device=None):
                                       num_classes,
                                       dropout=0.0,
                                       n_attention_vecs=4,
-                                      task=None,
+                                      task=task,
                                       pool_mode="concat",
                                       device=device)
 
 
-def make_SeqPairFancyAttentionClassifier(num_classes=None, task=None, device=None):
+def make_SeqPairFancyClassifier(num_classes=None, task=None, device=None):
     assert task is not None
     assert device is not None
     assert num_classes is not None
-    return SeqPairAttentionClassifier(768,
-                                      num_classes,
-                                      dropout=0.0,
-                                      n_attention_vecs=4,
-                                      task=None,
-                                      pool_mode="concat",
-                                      device=device)
+    return SeqPairFancyClassifier(768,
+                                  num_classes,
+                                  dropout=0.0,
+                                  n_attention_vecs=4,
+                                  task=task,
+                                  device=device)
 
 
-make_classifiers_dict = {
+# If you want to make a new classifier, add the function and the reference here with the
+# corresponding reference in the config/datasets.yml
+classifiers_dict = {
     'BiLSTMClassifier': make_BiLSTMClassifier,
     'AttentionClassifier': make_AttentionClassifier,
     'SeqPairAttentionClassifier': make_SeqPairAttentionClassifier,
-    'SeqPairFancyAttentionClassifier': make_SeqPairFancyAttentionClassifier
+    'SeqPairFancyClassifier': make_SeqPairFancyClassifier
 }

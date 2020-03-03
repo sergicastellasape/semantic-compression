@@ -16,12 +16,14 @@ class BiLSTMClassifier(nn.Module):
         sentset_size,
         num_layers,
         batch_size,
+        task=None,
         bidirectional=True,
         dropout=0.0,
         device=torch.device("cpu"),
     ):
         super(BiLSTMClassifier, self).__init__()
-
+        assert task is not None
+        self.task = task
         self.device = device
         self.hidden_dim = hidden_dim
         self.batch_size = batch_size
@@ -220,7 +222,7 @@ class SeqPairAttentionClassifier(nn.Module):
         # The linear layer that maps from embedding state space to sentiment classification space
         layer_multiplier = n_attention_vecs if self.pool_mode == "concat" else 1
         self.classifier = nn.Linear(
-            2 * embedding_dim * layer_multiplier, num_classes
+            embedding_dim * layer_multiplier, num_classes
         ).to(device)
 
         # Loss function as negative log likelihood, which needs a logsoftmax input
@@ -258,9 +260,7 @@ class SeqPairAttentionClassifier(nn.Module):
 
         # concatenate along sequence length dimension so attention is calculated
         # along both positive and negative sentiments
-        query1 = self.attention_vecs1.repeat(
-            inp_tensor1.size(0), 1, 1
-        )  # expand for batch size
+        query1 = self.attention_vecs1.repeat(inp_tensor1.size(0), 1, 1)  # expand for batch size
         query2 = self.attention_vecs2.repeat(inp_tensor2.size(0), 1, 1)
 
         # sequence is the input
@@ -395,9 +395,7 @@ class SeqPairFancyClassifier(nn.Module):
 
         # concatenate along sequence length dimension so attention is calculated
         # along both positive and negative sentiments
-        query1 = self.attention_vecs1.repeat(
-            inp_tensor1.size(0), 1, 1
-        )  # expand for batch size
+        query1 = self.attention_vecs1.repeat(inp_tensor1.size(0), 1, 1)  # expand for batch size
         query2 = self.attention_vecs2.repeat(inp_tensor2.size(0), 1, 1)
 
         # attention in between two sentences. att_weights size (batch, seq1, seq2)

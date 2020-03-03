@@ -5,10 +5,11 @@ from ..bracketing import (
     cos
 )
 
-sim_threshold = None
-span = None
+def make_bracketer(name=None,
+                   sim_threshold=None,
+                   span=None,
+                   device=None):
 
-def make_bracketer(name=None, device=None, **kwargs):
     assert device is not None
     assert name is not None
 
