@@ -1,0 +1,49 @@
+# datasets that will be used in training.
+# Make sure the ordering corresponds to the order of the multitasknet architectures
+# Available classifiers: BiLSTMClassifier, AttentionClassifier, SeqPairAttentionClassifier, NaivePoolingClassifier
+
+datasets: ['QQP', 'SST2']
+
+SST2:
+  path:
+    train: './assets/datasets/SST2/train.tsv'
+    test: './assets/datasets/SST2/test.tsv'
+    dev: './assets/datasets/SST2/dev.tsv'
+  batch_size: 16
+  classifier: 'AttentionClassifier'
+  get_batch_fn: !!python/name:model.data_utils.get_batch_SST2_from_indices # Loads function object
+  counter: 0
+  num_classes: 2
+
+QQP:
+  path:
+    train: './assets/datasets/QQP/train.tsv'
+    test: './assets/datasets/QQP/test.tsv'
+    dev: './assets/datasets/QQP/dev.tsv'
+  batch_size: 16
+  classifier: 'SeqPairAttentionClassifier'
+  get_batch_fn: !!python/name:model.data_utils.get_batch_QQP_from_indices # Loads function object
+  counter: 0
+  num_classes: 2
+
+MNLI:
+  path:
+    train: './assets/datasets/MNLI/train.tsv'
+    test: './assets/datasets/MNLI/test.tsv'
+    dev: './assets/datasets/MNLI/dev.tsv'
+  batch_size: 16
+  classifier: 'SeqPairAttentionClassifier'
+  get_batch_fn: !!python/name:model.data_utils.get_batch_MNLI_from_indices # Loads function object
+  counter: 0
+  num_classes: 3
+
+WNLI:
+  path:
+    train: './assets/datasets/WNLI/train.tsv'
+    test: './assets/datasets/WNLI/test.tsv'
+    dev: './assets/datasets/WNLI/dev.tsv'
+  batch_size: 16
+  classifier: 'SeqPairAttentionClassifier'
+  get_batch_fn: !!python/name:model.data_utils.get_batch_WNLI_from_indices # Loads function object
+  counter: 0
+  num_classes: 3

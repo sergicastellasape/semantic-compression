@@ -159,6 +159,7 @@ class AgglomerativeClusteringChunker(nn.Module):
 
 class HardSpanChunker(nn.Module):
     def __init__(self, span=None, device=torch.device('cpu')):
+        super().__init__()
         assert span is not None
         self.device = device
         self.id = nn.Identity()
@@ -166,9 +167,17 @@ class HardSpanChunker(nn.Module):
 
     def forward(self, input, masks_dict=None, **kwargs):
         assert masks_dict is not None
-        keep_non_padding = masks_dict['padding_mask'] == 1
-        lenghts = masks_dict['padding_mask']
-        indices_to_compact = None
+        batch_size, _ = masks_dict['padding_mask']
+        lenghts = masks_dict['padding_mask'].sum(dim=1)
+        indices_to_compact = []
+        for b in range(batch_size):
+            idx, j = [], 0
+            while j < lenghts[b]:
+                up_to = max(j + self.span, lenghts[b])
+                idx.append(list(range(j, up_to)))
+                j += up_to
+            indices_to_compact.append(idx)
+        print('indices to compact:', indices_to_compact)
         return indices_to_compact
 
 

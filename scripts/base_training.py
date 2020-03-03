@@ -30,6 +30,7 @@ from model.bracketing import (
     IdentityChunker,
     NNSimilarityChunker,
     AgglomerativeClusteringChunker,
+    HardSpanChunker,
     cos,
 )
 from model.transformer import Transformer
@@ -62,15 +63,27 @@ parser.add_argument(
     "-thr",
     dest="sim_threshold",
     type=float,
-    required=True,
+    default=666,
+    required=False,
     help="Similarity threshold used for chunking in the embedding space.",
 )
+
+parser.add_argument(
+    "--hard-span",
+    "-span",
+    dest="span",
+    type=int,
+    default=0,
+    required=False,
+    help="Hard span used for chunking naively.",
+)
+
 parser.add_argument(
     "--chunker",
     dest="chunker",
     type=str,
     required=True,
-    choices=["NNSimilarity", "agglomerative"],
+    choices=["NNSimilarity", "agglomerative", "hard"],
     help="Specify the bracketing part of the net",
 )
 parser.add_argument(
@@ -161,7 +174,6 @@ parser.add_argument(
     help="Set the datasets to train on.",
 )
 
-
 args = parser.parse_args()
 if args.load_checkpoint:
     assert os.path.exists(
@@ -201,21 +213,25 @@ transformer_net = Transformer(
     device=device,
 )
 
-if args.chunker == "NNSimilarity":
+if args.chunker == 'NNSimilarity':
     print("Using NNsimilarity chunker")
-    bracketing_net = NNSimilarityChunker(
-        sim_function=cos,
-        threshold=args.sim_threshold,
-        exclude_special_tokens=False,
-        combinatorics="sequential",
-        chunk_size_limit=60,
-        device=device,
-    )
-elif args.chunker == "agglomerative":
+    assert args.sim_threshold != 666, "Provide a valid threshold!"
+    bracketing_net = NNSimilarityChunker(sim_function=cos,
+                                         threshold=args.sim_threshold,
+                                         exclude_special_tokens=False,
+                                         combinatorics='sequential',
+                                         chunk_size_limit=60,
+                                         device=device)
+elif args.chunker == 'agglomerative':
     print("Using AGGLOMERATIVE chunker")
-    bracketing_net = AgglomerativeClusteringChunker(
-        threshold=args.sim_threshold, device=device
-    )
+    assert args.sim_threshold != 666, "Provide a valid threshold!"
+    bracketing_net = AgglomerativeClusteringChunker(threshold=args.sim_threshold,
+                                                    device=device)
+elif args.chunker == 'hard':
+    print("Using HARD SPAN chunker")
+    assert args.span != 0, "Provide a valid span!"
+    bracketing_net = HardSpanChunker(span=args.span,
+                                     device=device)
 else:
     raise ValueError("You must pass a valid chunker as an argument!")
 
