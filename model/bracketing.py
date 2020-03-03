@@ -173,9 +173,9 @@ class HardSpanChunker(nn.Module):
         for length in lengths:
             idxs, j = [], 0
             while j < length:
-                up_to = min(j + self.span, length)
+                up_to = min(j + self.span, int(length))
                 idxs.append(list(range(j, up_to)))
-                j += up_to
+                j += self.span
             indices_to_compact.append(idxs)
         return indices_to_compact
 
