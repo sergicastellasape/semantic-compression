@@ -115,7 +115,6 @@ class NNSimilarityChunker(nn.Module):
                     batch_all_indices_to_compact[b].append(indices)
 
         batch_indices_to_compact = batch_remove_subsets(batch_all_indices_to_compact)
-        #print(batch_indices_to_compact)
         return batch_indices_to_compact
 
 
@@ -123,7 +122,6 @@ class AgglomerativeClusteringChunker(nn.Module):
     """
     Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors
     """
-
     def __init__(self, threshold=0.9, device=torch.device("cpu")):
         super().__init__()
         self.device = device
