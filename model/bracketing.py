@@ -115,7 +115,6 @@ class NNSimilarityChunker(nn.Module):
                     batch_all_indices_to_compact[b].append(indices)
 
         batch_indices_to_compact = batch_remove_subsets(batch_all_indices_to_compact)
-        #print(batch_indices_to_compact)
         return batch_indices_to_compact
 
 
@@ -123,7 +122,6 @@ class AgglomerativeClusteringChunker(nn.Module):
     """
     Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors
     """
-
     def __init__(self, threshold=0.9, device=torch.device("cpu")):
         super().__init__()
         self.device = device
@@ -159,6 +157,7 @@ class AgglomerativeClusteringChunker(nn.Module):
 
 class HardSpanChunker(nn.Module):
     def __init__(self, span=None, device=torch.device('cpu')):
+        super().__init__()
         assert span is not None
         self.device = device
         self.id = nn.Identity()
@@ -166,9 +165,16 @@ class HardSpanChunker(nn.Module):
 
     def forward(self, input, masks_dict=None, **kwargs):
         assert masks_dict is not None
-        keep_non_padding = masks_dict['padding_mask'] == 1
-        lenghts = masks_dict['padding_mask']
-        indices_to_compact = None
+        batch_size, _ = masks_dict['padding_mask'].size()
+        lengths = masks_dict['padding_mask'].sum(dim=1)
+        indices_to_compact = []
+        for length in lengths:
+            idxs, j = [], 0
+            while j < length:
+                up_to = min(j + self.span, int(length))
+                idxs.append(list(range(j, up_to)))
+                j += self.span
+            indices_to_compact.append(idxs)
         return indices_to_compact
 
 

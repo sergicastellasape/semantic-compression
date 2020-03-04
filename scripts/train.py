@@ -18,151 +18,26 @@ from transformers import BertModel, BertTokenizer
 
 # Custom imports
 sys.path.append(".")  # Add parent directory to sys.path to import from root dir
-from model.model import MultiTaskNet, End2EndModel
-from model.classifiers import (
-    AttentionClassifier,
-    SeqPairAttentionClassifier,
-    NaivePoolingClassifier,
-    SeqPairFancyClassifier,
-)
-from model.generators import IdentityGenerator, EmbeddingGenerator
-from model.bracketing import (
-    IdentityChunker,
-    NNSimilarityChunker,
-    AgglomerativeClusteringChunker,
-    cos,
-)
-from model.transformer import Transformer
-from model.data_utils import get_batch_SST2_from_indices, get_batch_QQP_from_indices
+from model.model import End2EndModel
+
+# Neural Network Builder functions
+from model.builder.transformer import make_transformer
+from model.builder.bracketing import make_bracketer
+from model.builder.multitask import make_multitask_net
+from model.builder.generators import make_generator
+
 from model.utils import (
     eval_model_on_DF,
-    make_connectivity_matrix,
-    add_space_to_special_characters,
     str2bool,
     str2list,
-    filter_indices,
-    expand_indices,
-    time_since,
     txt2list,
     abs_max_pooling,
-    hotfix_pack_padded_sequence
+    mean_pooling
 )
 
-parser = argparse.ArgumentParser(description="Model Options")
-parser.add_argument(
-    "--run-identifier",
-    "-id",
-    dest="run_id",
-    type=str,
-    required=True,
-    help="Add an identifier that will be used to store the run in tensorboard.",
-)
-parser.add_argument(
-    "--similarity-threshold",
-    "-thr",
-    dest="sim_threshold",
-    type=float,
-    required=True,
-    help="Similarity threshold used for chunking in the embedding space.",
-)
-parser.add_argument(
-    "--chunker",
-    dest="chunker",
-    type=str,
-    required=True,
-    choices=["NNSimilarity", "agglomerative"],
-    help="Specify the bracketing part of the net",
-)
-parser.add_argument(
-    "--learning-rate",
-    "-lr",
-    dest="lr",
-    type=float,
-    required=False,
-    default=0.0001,
-    help="Learning rate for Adam optimizer",
-)
-parser.add_argument(
-    "--tensorboard-dir",
-    "-tbdir",
-    dest="log_dir",
-    type=str,
-    required=False,
-    default="./tensorboard",
-    help="rood directory where tensorboard logs are stored. ./tensorboard by default",
-)
-parser.add_argument(
-    "--tensorboard-comment",
-    "-tbcomment",
-    dest="tensorboard_comment",
-    type=str,
-    required=False,
-    default=None,
-)
-parser.add_argument(
-    "--eval-periodicity",
-    "-evalperiod",
-    type=int,
-    required=False,
-    default=50,
-    dest="evalperiod",
-    help="How often in iterations the model is evaluated",
-)
-parser.add_argument(
-    "--load-checkpoint",
-    "-load",
-    dest="load_checkpoint",
-    required=False,
-    action="store_true",
-)
-parser.add_argument(
-    "--wall-time",
-    "-wt",
-    dest="walltime",
-    required=False,
-    type=int,
-    default=3600,
-    help="Walltime for training",
-)
-parser.add_argument(
-    "--train-compression",
-    "-tc",
-    required=True,
-    type=str2bool,
-    dest="train_comp",
-    help="set if compression happens during training, True or False",
-)
-parser.add_argument(
-    "--eval-compression",
-    "-ec",
-    required=True,
-    type=str2bool,
-    dest="eval_comp",
-    help="set if compression happens during evaluation, True or False",
-)
+# Import comand line arguments
+from args_train import args
 
-parser.add_argument(
-    "--full-test-eval",
-    "-fev",
-    required=False,
-    default='False',
-    type=str2bool,
-    dest="full_test_eval",
-    help="Set if an evaluation on the full test set is made at the end.",
-)
-
-parser.add_argument(
-    "--datasets",
-    "-dts",
-    required=False,
-    default='[SST2, QQP]',
-    type=str2list,
-    dest="datasets",
-    help="Set the datasets to train on.",
-)
-
-
-args = parser.parse_args()
 if args.load_checkpoint:
     assert os.path.exists(
         f"./assets/checkpoints/{args.run_id}.pt"
@@ -193,65 +68,21 @@ device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
 print(f"Device being used: {device}")
 
-transformer_net = Transformer(
-    model_class=BertModel,
-    tokenizer_class=BertTokenizer,
-    pre_trained_weights="bert-base-uncased",
-    output_layer=-2,
-    device=device,
-)
+# Assign threshold if it was given in args
+sim_threshold = args.sim_threshold if args.sim_threshold != 666 else None
+span = args.span if args.span != 0 else None
 
-if args.chunker == "NNSimilarity":
-    print("Using NNsimilarity chunker")
-    bracketing_net = NNSimilarityChunker(
-        sim_function=cos,
-        threshold=args.sim_threshold,
-        exclude_special_tokens=False,
-        combinatorics="sequential",
-        chunk_size_limit=60,
-        device=device,
-    )
-elif args.chunker == "agglomerative":
-    print("Using AGGLOMERATIVE chunker")
-    bracketing_net = AgglomerativeClusteringChunker(
-        threshold=args.sim_threshold, device=device
-    )
-else:
-    raise ValueError("You must pass a valid chunker as an argument!")
-
-generator_net = EmbeddingGenerator(pool_function=abs_max_pooling,
+transformer_net = make_transformer(output_layer=-2,
                                    device=device)
-
-seq_classifier = AttentionClassifier(embedding_dim=768,
-                                     sentset_size=2,
-                                     task='SST2',
-                                     dropout=0.3,
-                                     n_sentiments=4,
-                                     pool_mode="concat",
-                                     device=device).to(device)
-
-seq_pair_classifier = SeqPairFancyClassifier(embedding_dim=768,
-                                             num_classes=2,
-                                             task='QQP',
-                                             dropout=0.3,
-                                             n_attention_vecs=2,
-                                             device=device).to(device)
-
-seq_pair_classifier2 = SeqPairFancyClassifier(embedding_dim=768,
-                                              num_classes=3,
-                                              task='MNLI',
-                                              dropout=0.3,
-                                              n_attention_vecs=2,
-                                              device=device).to(device)
-
-pooling_classifier = NaivePoolingClassifier(embedding_dim=768,
-                                            num_classes=3,
-                                            task='MNLI',
-                                            dropout=0.3,
-                                            device=device).to(device)
-
-multitask_net = MultiTaskNet(pooling_classifier,
-                             device=device).to(device)
+bracketing_net = make_bracketer(name=args.chunker,
+                                device=device,
+                                sim_threshold=sim_threshold,
+                                span=span)
+generator_net = make_generator(pooling=args.pooling,
+                               device=device)
+multitask_net = make_multitask_net(datasets=args.datasets,
+                                   config=config,
+                                   device=device)
 
 model = End2EndModel(transformer=transformer_net,
                      bracketer=bracketing_net,
@@ -259,9 +90,6 @@ model = End2EndModel(transformer=transformer_net,
                      multitasknet=multitask_net,
                      device=device).to(device)
 
-for dataset in config['datasets']:
-    assert dataset in model.multitasknet.parallel_net_dict.keys(), \
-        f"You forgot to add a model for task {dataset}"
 
 ##########################################################################
 ########################## DEFINE CONSTANTS ##############################
@@ -373,7 +201,7 @@ while not finished_training:
     L.backward()
     optimizer.step()
     batch_loss += L.item()
-    if (global_counter % eval_periodicity == 0) and (global_counter != 0):
+    if (global_counter % eval_periodicity == 0):  #and (global_counter != 0):
         print(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
