@@ -184,19 +184,54 @@ class AttentionClassifier(nn.Module):
         sentiment_logscore = F.log_softmax(sentiment, dim=1)
         return sentiment_logscore
 
-"""
-class ConvAttentionClassifier(nn.Module):
+
+class DecAttClassifiter(nn.Module):
+    """
+    Seq pair classifier based on: "A Decomposable Attention Model for Natural Language Inference"
+    It's basically attention between the two sentences, aggregation and classification.
+    https://arxiv.org/pdf/1606.01933.pdf
+    """
     def __init__(self,
                  embedding_dim,
                  num_classes,
-                 dropout=0.0,
-                 n_attention_vecs=2,
-                 device=torch.device("cpu")):
-        super()__init__()
+                 dropout=0.3,
+                 task=None,
+                 pool_func=abs_max_pooling,
+                 device=torch.device('cpu')):
+        super().__init__()
+        assert task is not None
+        self.task = task
         self.device = device
+        self.pool_func = pool_func
 
-        self.conv1d = nn.Conv2d(1, 1, (embedding_dim, 3), )
-"""
+        # Define 1 -> 2 attention layer
+        self.att12 = Attention(embedding_dim, attention_type="general").to(device)
+        self.att21 = Attention(embedding_dim, attention_type="general").to(device)
+        self.classifier = nn.Linear(embedding_dim * 2, num_classes).to(device)
+
+        # Cross entropy loss function that's fed with the log_scores (numerical stability)
+        self.loss_fn = nn.NLLLoss(reduction="mean")
+
+    def loss(self, prediction, target):
+        return self.loss_fn(prediction, target)
+
+    def forward(self, inp, seq_pair_mask=None):
+        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(inp.size()).to(self.device)
+        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(inp.size()).to(self.device)
+        inp_tensor1 = inp * mask_1
+        inp_tensor2 = inp * mask_2
+
+        att_seq1 = self.att12(inp_tensor1, inp_tensor2)[0] * mask_1
+        att_seq2 = self.att21(inp_tensor2, inp_tensor1)[0] * mask_2
+
+        aggregation_seq1 = self.pool_func(att_seq1, dim=1)
+        aggregation_seq2 = self.pool_func(att_seq2, dim=1)
+
+        classifier_features = torch.cat([aggregation_seq1, aggregation_seq2], dim=1)
+        class_score = self.classifier(classifier_features)
+        class_log_score = F.log_softmax(class_score, dim=1)
+
+        return class_log_score
 
 
 class SeqPairAttentionClassifier(nn.Module):

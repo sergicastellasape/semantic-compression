@@ -2,8 +2,10 @@ from ..classifiers import (
     BiLSTMClassifier,
     AttentionClassifier,
     SeqPairAttentionClassifier,
-    SeqPairFancyClassifier
+    SeqPairFancyClassifier,
+    DecAttClassifiter
 )
+from ..utils import abs_max_pooling
 
 
 def make_BiLSTMClassifier(*args, device, **kwargs):
@@ -56,11 +58,23 @@ def make_SeqPairFancyClassifier(num_classes=None, task=None, device=None):
                                   device=device)
 
 
+def male_DecAttClassifier(num_classes=None, task=None, device=None):
+    assert task is not None
+    assert device is not None
+    assert num_classes is not None
+    return DecAttClassifiter(768,
+                             num_classes,
+                             dropout=0.3,
+                             task=task,
+                             pool_func=abs_max_pooling,
+                             device=device)
+
 # If you want to make a new classifier, add the function and the reference here with the
 # corresponding reference in the config/datasets.yml
 classifiers_dict = {
     'BiLSTMClassifier': make_BiLSTMClassifier,
     'AttentionClassifier': make_AttentionClassifier,
     'SeqPairAttentionClassifier': make_SeqPairAttentionClassifier,
-    'SeqPairFancyClassifier': make_SeqPairFancyClassifier
+    'SeqPairFancyClassifier': make_SeqPairFancyClassifier,
+    'DecAttClassifier': male_DecAttClassifier,
 }
