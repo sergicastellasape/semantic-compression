@@ -3,6 +3,7 @@ Collection of useful little functions.
 """
 import re
 import time
+import argparse
 from collections import defaultdict
 from tqdm import tqdm
 import math
@@ -63,12 +64,18 @@ def eval_model_on_DF(
         return metrics_dict
 
 
-def make_connectivity_matrix(length):
+def make_connectivity_matrix(length, k=1):
+    assert length > k
     col, row = [], []
-    for i in range(length - 1):
-        col.extend([i, i + 1])
-        row.extend([i + 1, i])
-    data = np.ones(length * 2 - 2, dtype=int)
+    for d in range(k):
+        y = list(range(0, length - (d + 1)))
+        x = list(range(d + 1, length))
+        col.extend(x)
+        col.extend(y)
+        row.extend(y)
+        row.extend(x)
+    N_ones = 2 * (k * length - sum(range(k + 1)))
+    data = np.ones(N_ones, dtype=int)
     connectivity_matrix = scipy.sparse.coo_matrix(
         (data, (row, col)), shape=(length, length)
     ).toarray()
