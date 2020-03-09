@@ -69,8 +69,8 @@ class BiLSTMClassifier(nn.Module):
     def loss(self, predicted, target):
         return self.loss_fn(predicted, target)
 
-    def forward(self, input, pooling=None, **kwargs):
-
+    def forward(self, input, pooling=None, masks_dict=None, **kwargs):
+        assert masks_dict is not None
         # Calculate original lengths
         collapse_embedding_dim_tensors = input.sum(
             dim=2
@@ -133,22 +133,14 @@ class AttentionClassifier(nn.Module):
 
         # The linear layer that maps from embedding state space to sentiment classification space
         if self.pool_mode == "concat":
-            # self.classifier = nn.Sequential(nn.Linear(embedding_dim*n_sentiments, 100),
-            #                                nn.ELU(),
-            #                                nn.Linear(100, sentset_size))
-            self.classifier = nn.Linear(embedding_dim * n_sentiments, sentset_size).to(
-                device
-            )
+            self.classifier = nn.Linear(embedding_dim * n_sentiments, sentset_size).to(device)
         else:
-            # self.classifier = nn.Sequential(nn.Linear(embedding_dim, 100),
-            #                                       nn.ELU,
-            #                                       nn.Linear(100, sentset_size))
             self.classifier = nn.Linear(embedding_dim, sentset_size).to(device)
 
         # Loss function as negative log likelihood, which needs a logsoftmax input
         self.loss_fn = nn.NLLLoss(reduction="mean")
 
-        # initialize the vectors that represent sentiments characteristics,
+        # Initialize the vectors that represent sentiments characteristics,
         # and add them as model parameters so that they're trained by backprop
         init_normal = torch.empty(1, n_sentiments, embedding_dim).normal_(
             mean=0, std=0.3
@@ -160,15 +152,16 @@ class AttentionClassifier(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, input, pooling=None, **kwargs):
+    def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
+        assert masks_dict is not None
         # concatenate along sequence length dimension so attention is calculated
         # along both positive and negative sentiments
         query = self.sentiment_queries.repeat(
-            input.size(0), 1, 1
+            inp.size(0), 1, 1
         )  # expand for batch size
 
         # sequence is the input
-        self_attended_context, _ = self.self_attend(input, input)
+        self_attended_context, _ = self.self_attend(inp, inp)
 
         # self_attended_context = self.feedforward(self_attended_context)
 
@@ -184,6 +177,62 @@ class AttentionClassifier(nn.Module):
         sentiment_logscore = F.log_softmax(sentiment, dim=1)
         return sentiment_logscore
 
+
+class ConvAttClassifier(nn.Module):
+    def __init__(
+        self,
+        embedding_dim,
+        num_classes,
+        dropout=0.0,
+        n_attention_vecs=3,
+        task=None,
+        device=torch.device("cpu"),
+    ):
+        super().__init__()
+        assert task is not None
+        self.task = task
+        self.device = device
+
+        # Define attention layers:
+        self.conv1D = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=5, padding=2)  # padding=(kernel-1)/2
+        self.skip_weight = nn.Parameter(torch.tensor(0.1, requires_grad=True))
+        self.attend = Attention(embedding_dim, attention_type="general").to(device)
+        self.classifier = nn.Linear(n_attention_vecs * embedding_dim, num_classes)
+
+        # Loss function as negative log likelihood, which needs a logsoftmax input
+        self.loss_fn = nn.NLLLoss(reduction="mean")
+
+        # Initialize the vectors that represent sentiments characteristics,
+        # and add them as model parameters so that they're trained by backprop
+        init_normal = torch.empty(1, n_attention_vecs, embedding_dim).normal_(
+            mean=0, std=0.3
+        )
+        self.attention_vecs = nn.Parameter(
+            init_normal.clone().detach().requires_grad_(True).to(device)
+        )
+
+    def loss(self, prediction, target):
+        return self.loss_fn(prediction, target)
+
+    def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+        mask = (masks_dict['padding_mask']).unsqueeze(-1).expand(inp.size()).to(self.device)
+
+        # concatenate along sequence length dimension so attention is calculated
+        # along both positive and negative sentiments
+        query = self.attention_vecs.repeat(
+            inp.size(0), 1, 1
+        )  # expand for batch size
+
+        # sequence is the input, transpose is to adapt for conv layer input convention
+        conv_out = self.conv1D(inp.transpose(1, 2)).transpose(1, 2)
+        mix = (1 - self.skip_weight) * inp + self.skip_weight * conv_out
+        attention_seq, _ = self.attend(query, mix * mask)
+
+        class_score = self.classifier(attention_seq.flatten(1))
+        class_logscore = F.log_softmax(class_score, dim=1)
+
+        return class_logscore
 
 class DecAttClassifiter(nn.Module):
     """
@@ -215,7 +264,10 @@ class DecAttClassifiter(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, inp, seq_pair_mask=None):
+    def forward(self, inp, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+        seq_pair_mask = masks_dict['seq_pair_mask']
+
         mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(inp.size()).to(self.device)
         mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(inp.size()).to(self.device)
         inp_tensor1 = inp * mask_1
@@ -281,10 +333,12 @@ class SeqPairAttentionClassifier(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, input, seq_pair_mask=None):
+    def forward(self, input, masks_dict=None, **kwargs):
         """
         Input_tup should be a tuple of two tensors, containing the batches
         """
+        seq_pair_mask = masks_dict['seq_pair_mask']
+
         # seq_pair_mask looks like [00000000001111111111] so for the second sentence
         # one needs to multiply by the mask and for the first one it's the negation
         mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
@@ -414,10 +468,12 @@ class SeqPairFancyClassifier(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, input, seq_pair_mask=None):
+    def forward(self, input, masks_dict=None, **kwargs):
         """
         Input_tup should be a tuple of two tensors, containing the batches
         """
+        assert masks_dict is not None
+        seq_pair_mask = masks_dict['seq_pair_mask']
         batch_size = input.size(0)
         # seq_pair_mask looks like [00000000001111111111] so for the second sentence
         # one needs to multiply by the mask and for the first one it's the negation

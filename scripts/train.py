@@ -102,11 +102,16 @@ eval_periodicity = args.evalperiod
 writer = SummaryWriter(
     log_dir=os.path.join(LOG_DIR, run_identifier), comment=args.tensorboard_comment
 )
+
 checkpoints_path = os.path.join(
     "./assets/checkpoints/", f"{run_identifier}.pt")
 if args.load_checkpoint:
     print(f'Loading checkpoint from {checkpoints_path}')
     model.load_state_dict(torch.load(checkpoints_path))
+
+# Create checkpoints dir if it doesn't exist yet
+if not os.path.exists('./assets/checkpoints'):
+    os.makedirs('./assets/checkpoints')
 
 # LOAD CONFIG DICTS AND CREATE NEW ONES FROM THOSE
 counter = {dataset: config[dataset]["counter"]

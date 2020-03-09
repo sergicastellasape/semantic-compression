@@ -3,7 +3,8 @@ from ..classifiers import (
     AttentionClassifier,
     SeqPairAttentionClassifier,
     SeqPairFancyClassifier,
-    DecAttClassifiter
+    DecAttClassifiter,
+    ConvAttClassifier
 )
 from ..utils import abs_max_pooling
 
@@ -58,7 +59,7 @@ def make_SeqPairFancyClassifier(num_classes=None, task=None, device=None):
                                   device=device)
 
 
-def male_DecAttClassifier(num_classes=None, task=None, device=None):
+def make_DecAttClassifier(num_classes=None, task=None, device=None):
     assert task is not None
     assert device is not None
     assert num_classes is not None
@@ -69,6 +70,19 @@ def male_DecAttClassifier(num_classes=None, task=None, device=None):
                              pool_func=abs_max_pooling,
                              device=device)
 
+
+def make_ConvAttClassifier(num_classes=None, task=None, device=None):
+    assert task is not None
+    assert device is not None
+    assert num_classes is not None
+    return ConvAttClassifier(768,
+                             num_classes,
+                             dropout=0.3,
+                             task=task,
+                             n_attention_vecs=3,
+                             device=device)
+
+
 # If you want to make a new classifier, add the function and the reference here with the
 # corresponding reference in the config/datasets.yml
 classifiers_dict = {
@@ -76,5 +90,6 @@ classifiers_dict = {
     'AttentionClassifier': make_AttentionClassifier,
     'SeqPairAttentionClassifier': make_SeqPairAttentionClassifier,
     'SeqPairFancyClassifier': make_SeqPairFancyClassifier,
-    'DecAttClassifier': male_DecAttClassifier,
+    'DecAttClassifier': make_DecAttClassifier,
+    'ConvAttClassifier': make_ConvAttClassifier,
 }

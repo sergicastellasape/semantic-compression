@@ -43,7 +43,7 @@ class Attention(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         self.tanh = nn.Tanh()
 
-    def forward(self, query, context):
+    def forward(self, query, context, temperature=1.):
         """
         Args:
             query (:class:`torch.FloatTensor` [batch size, output length, dimensions]): Sequence of
@@ -74,7 +74,7 @@ class Attention(nn.Module):
 
         # Compute weights across every context sequence
         attention_scores = attention_scores.view(batch_size * output_len, query_len)
-        attention_weights = self.softmax(attention_scores)
+        attention_weights = self.softmax(attention_scores/temperature)
         attention_weights = attention_weights.view(batch_size, output_len, query_len)
 
         # (batch_size, output_len, query_len) * (batch_size, query_len, dimensions) ->

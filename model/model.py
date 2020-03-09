@@ -91,7 +91,7 @@ class MultiTaskNet(nn.Module):
         self.parallel_net_dict = nn.ModuleDict({net.task: net for net in task_networks})
         self.config = config
 
-    def forward(self, input, batch_slices=None, masks_dict=None):
+    def forward(self, inp, batch_slices=None, masks_dict=None):
         assert batch_slices is not None
         assert masks_dict is not None
         output = {}
@@ -99,11 +99,14 @@ class MultiTaskNet(nn.Module):
         # dependency, but makes the implementation more complex, given that the
         # input for each parallel net is different
         for dataset, task_net in self.parallel_net_dict.items():
-            inp_split = input[batch_slices[dataset], :, :]
-            seq_pair_mask = masks_dict["seq_pair_mask"][batch_slices[dataset], :]
+            inp_split = inp[batch_slices[dataset], :, :]
+            masks_dict_sliced = {
+                key: value[batch_slices[dataset], :]
+                for key, value in masks_dict.items()
+            }
             if inp_split.size(0) > 0:
                 output[dataset] = task_net.forward(inp_split,
-                                                   seq_pair_mask=seq_pair_mask)
+                                                   masks_dict=masks_dict_sliced)
         return output
 
     def loss(self, predictions, targets, weights=None):
