@@ -126,7 +126,8 @@ class AgglomerativeClusteringChunker(nn.Module):
         super().__init__()
         self.device = device
         # agg clustering wants distance not similarity
-        self.dist_threshold = 1 - threshold
+        # self.dist_threshold = 1 - threshold
+        self.dist_threshold = threshold
         self.span = span
         self.id = nn.Identity()
 
@@ -138,13 +139,13 @@ class AgglomerativeClusteringChunker(nn.Module):
             filtered_embedding = embeddings[keep_non_padding[b, :], :]
             length, _ = filtered_embedding.shape
             connectivity_matrix = make_connectivity_matrix(length, span=self.span)
-            cl = cluster.AgglomerativeClustering(n_clusters=self.n_clusters,
+            cl = cluster.AgglomerativeClustering(n_clusters=None,
                                                  affinity="euclidean",
                                                  memory=None,
                                                  connectivity=connectivity_matrix,
                                                  compute_full_tree=True,
                                                  linkage="ward",
-                                                 distance_threshold=None)
+                                                 distance_threshold=self.dist_threshold)
             # This outputs an unordered cluster labelling:
             # L = [4, 4, 1, 4, 1, 1, 0, 3, 2, 2, 3]
             L = cl.fit_predict(filtered_embedding)
@@ -160,30 +161,7 @@ class AgglomerativeClusteringChunker(nn.Module):
                 seen_clusters.append(cluster_)
                 pos = cluster_dict[str(cluster_)]
                 ordered_idxs[pos] += (idx,)
-
-
-
-
-
-
-            filtered_embedding = embeddings[keep_non_padding[b, :], :]
-            length, _ = filtered_embedding.shape
-            connectivity_matrix = make_connectivity_matrix(length, span=self.span)
-            cl = cluster.AgglomerativeClustering(n_clusters=None,
-                                                 affinity="cosine",
-                                                 memory=None,
-                                                 connectivity=connectivity_matrix,
-                                                 compute_full_tree=True,
-                                                 linkage="average",
-                                                 distance_threshold=self.dist_threshold)
-            N = cl.fit_predict(filtered_embedding)
-            C = Counter(N)
-            ordered_idx, i = [], 0
-            for k, v in C.items():
-                ordered_idx.append(tuple(range(i, i + v)))
-                i += v
-            indices_to_compact.append(ordered_idx)
-
+            indices_to_compact.append(ordered_idxs)
         return indices_to_compact
 
 

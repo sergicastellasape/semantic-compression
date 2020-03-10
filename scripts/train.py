@@ -77,6 +77,7 @@ transformer_net = make_transformer(output_layer=-2,
 bracketing_net = make_bracketer(name=args.chunker,
                                 device=device,
                                 sim_threshold=sim_threshold,
+                                dist_threshold=sim_threshold,
                                 span=span)
 generator_net = make_generator(pooling=args.pooling,
                                device=device)

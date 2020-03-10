@@ -7,6 +7,7 @@ from ..bracketing import (
 
 def make_bracketer(name=None,
                    sim_threshold=None,
+                   dist_threshold=None,
                    span=None,
                    device=None):
 
@@ -24,8 +25,8 @@ def make_bracketer(name=None,
                                              device=device)
     elif name == 'agglomerative':
         print("Using AGGLOMERATIVE chunker")
-        assert sim_threshold is not None, "Provide a valid threshold!"
-        bracketing_net = AgglomerativeClusteringChunker(threshold=sim_threshold,
+        assert dist_threshold is not None, "Provide a valid threshold!"
+        bracketing_net = AgglomerativeClusteringChunker(threshold=dist_threshold,
                                                         device=device)
     elif name == 'hard':
         print("Using HARD SPAN chunker")
