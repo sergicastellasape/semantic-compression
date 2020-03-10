@@ -12,6 +12,7 @@ parser.add_argument(
     required=True,
     help="Add an identifier that will be used to store the run in tensorboard.",
 )
+
 parser.add_argument(
     "--similarity-threshold",
     "-thr",
