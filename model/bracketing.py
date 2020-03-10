@@ -122,40 +122,69 @@ class AgglomerativeClusteringChunker(nn.Module):
     """
     Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors
     """
-    def __init__(self, threshold=0.9, device=torch.device("cpu")):
+    def __init__(self, threshold=0.9, span=1, device=torch.device("cpu")):
         super().__init__()
         self.device = device
         # agg clustering wants distance not similarity
         self.dist_threshold = 1 - threshold
+        self.span = span
         self.id = nn.Identity()
 
-    def forward(self, inp, span=1):
-        length, _ = inp.shape
-        connectivity_matrix = make_connectivity_matrix(length, span=span)
-        cl = cluster.AgglomerativeClustering(n_clusters=self.n_clusters,
-                                             affinity="euclidean",
-                                             memory=None,
-                                             connectivity=connectivity_matrix,
-                                             compute_full_tree=True,
-                                             linkage="ward",
-                                             distance_threshold=None)
-        # This outputs an unordered cluster labelling:
-        # L = [4, 4, 1, 4, 1, 1, 0, 3, 2, 2, 3]
-        L = cl.fit_predict(inp)
-        # Here we order and group the indices of the
-        # vectors in tuple such that:
-        # L -> [(0, 1, 3), (2, 4, 5), (6), (7, 10), (8, 9)]
-        ordered_idxs = [()] * (max(L) + 1)
-        seen_clusters, cluster_dict, cluster_counter = [], {}, 0
-        for idx, cluster_ in enumerate(L):
-            if cluster_ not in seen_clusters:
-                cluster_dict[str(cluster_)] = cluster_counter
-                cluster_counter += 1
-            seen_clusters.append(cluster_)
-            pos = cluster_dict[str(cluster_)]
-            ordered_idxs[pos] += (idx,)
+    def forward(self, input, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+        keep_non_padding = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
+        indices_to_compact = []
+        for b, embeddings in enumerate(input.detach().cpu().numpy()):  # loop over each element in batch
+            filtered_embedding = embeddings[keep_non_padding[b, :], :]
+            length, _ = filtered_embedding.shape
+            connectivity_matrix = make_connectivity_matrix(length, span=self.span)
+            cl = cluster.AgglomerativeClustering(n_clusters=self.n_clusters,
+                                                 affinity="euclidean",
+                                                 memory=None,
+                                                 connectivity=connectivity_matrix,
+                                                 compute_full_tree=True,
+                                                 linkage="ward",
+                                                 distance_threshold=None)
+            # This outputs an unordered cluster labelling:
+            # L = [4, 4, 1, 4, 1, 1, 0, 3, 2, 2, 3]
+            L = cl.fit_predict(filtered_embedding)
+            # Here we order and group the indices of the
+            # vectors in tuple such that:
+            # L -> [(0, 1, 3), (2, 4, 5), (6), (7, 10), (8, 9)]
+            ordered_idxs = [()] * (max(L) + 1)
+            seen_clusters, cluster_dict, cluster_counter = [], {}, 0
+            for idx, cluster_ in enumerate(L):
+                if cluster_ not in seen_clusters:
+                    cluster_dict[str(cluster_)] = cluster_counter
+                    cluster_counter += 1
+                seen_clusters.append(cluster_)
+                pos = cluster_dict[str(cluster_)]
+                ordered_idxs[pos] += (idx,)
 
-        return ordered_idxs
+
+
+
+
+
+            filtered_embedding = embeddings[keep_non_padding[b, :], :]
+            length, _ = filtered_embedding.shape
+            connectivity_matrix = make_connectivity_matrix(length, span=self.span)
+            cl = cluster.AgglomerativeClustering(n_clusters=None,
+                                                 affinity="cosine",
+                                                 memory=None,
+                                                 connectivity=connectivity_matrix,
+                                                 compute_full_tree=True,
+                                                 linkage="average",
+                                                 distance_threshold=self.dist_threshold)
+            N = cl.fit_predict(filtered_embedding)
+            C = Counter(N)
+            ordered_idx, i = [], 0
+            for k, v in C.items():
+                ordered_idx.append(tuple(range(i, i + v)))
+                i += v
+            indices_to_compact.append(ordered_idx)
+
+        return indices_to_compact
 
 
 class HardSpanChunker(nn.Module):
