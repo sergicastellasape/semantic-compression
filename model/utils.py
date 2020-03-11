@@ -65,7 +65,7 @@ def eval_model_on_DF(
 
 
 def make_connectivity_matrix(length, span=1):
-    assert length > span
+    span = min(length - 1, span)
     col, row = [], []
     for d in range(span):
         y = list(range(0, length - (d + 1)))
@@ -74,6 +74,7 @@ def make_connectivity_matrix(length, span=1):
         col.extend(y)
         row.extend(y)
         row.extend(x)
+    # Precomput the number of 1s in the sparse mtrx
     N_ones = 2 * (span * length - sum(range(span + 1)))
     data = np.ones(N_ones, dtype=int)
     connectivity_matrix = scipy.sparse.coo_matrix(
@@ -81,6 +82,9 @@ def make_connectivity_matrix(length, span=1):
     ).toarray()
     return connectivity_matrix
 
+def compression2euclideandist(compression):
+    distance_threshold = None
+    return distance_threshold
 
 def add_space_to_special_characters(string, characters=[]):
     for char in characters:

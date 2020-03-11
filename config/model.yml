@@ -1,1 +1,2 @@
-chunker: 'NNSimilarity' # choose between {NNSimilarity, agglomerative}
+bracketing:
+

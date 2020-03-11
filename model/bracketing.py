@@ -120,9 +120,13 @@ class NNSimilarityChunker(nn.Module):
 
 class AgglomerativeClusteringChunker(nn.Module):
     """
-    Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors
+    Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors.
+    This turned into a nightmare after realizing that the agglomerative
+    clustering from sklearn can't take a non-fully connected connectivity
+    matrix. So the code is UGLY... but I needed to implement somehow the option to
+    remove the special tokens and also prevent merging seq pairs...
     """
-    def __init__(self, threshold=0.9, span=1, device=torch.device("cpu")):
+    def __init__(self, threshold=0.9, span=4, device=torch.device("cpu")):
         super().__init__()
         self.device = device
         # agg clustering wants distance not similarity
@@ -131,24 +135,56 @@ class AgglomerativeClusteringChunker(nn.Module):
         self.span = span
         self.id = nn.Identity()
 
-    def forward(self, input, masks_dict=None, **kwargs):
+    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
         assert masks_dict is not None
-        keep_non_padding = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
+        if keep_special_tokens:
+            keep_mask = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
+        else:
+            keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach().cpu().numpy()
+        # Mask with 1s on tokens that are not regular only if
+        # keep_special_tokens=False, otherwise this will be 0s
+        special_tokens = (masks_dict['padding_mask'] - keep_mask).detach().cpu().numpy()
+        full_seq_pair_mask = masks_dict['seq_pair_mask'].detach().cpu().numpy()
         indices_to_compact = []
-        for b, embeddings in enumerate(input.detach().cpu().numpy()):  # loop over each element in batch
-            filtered_embedding = embeddings[keep_non_padding[b, :], :]
-            length, _ = filtered_embedding.shape
-            connectivity_matrix = make_connectivity_matrix(length, span=self.span)
-            cl = cluster.AgglomerativeClustering(n_clusters=None,
-                                                 affinity="euclidean",
-                                                 memory=None,
-                                                 connectivity=connectivity_matrix,
-                                                 compute_full_tree=True,
-                                                 linkage="ward",
-                                                 distance_threshold=self.dist_threshold)
-            # This outputs an unordered cluster labelling:
-            # L = [4, 4, 1, 4, 1, 1, 0, 3, 2, 2, 3]
-            L = cl.fit_predict(filtered_embedding)
+        # loop over each element in batch, I know. it's a shame this is sequential
+        for b, embeddings in enumerate(inp.detach().cpu().numpy()):
+            filtered_embedding = embeddings[keep_mask[b, :], :]
+            # remove pad and special tokens if necessary
+            seq_pair_mask = full_seq_pair_mask[b, keep_mask[b, :]]
+            # keep track of the indices that need to be added later
+            idxs_filtered_out = special_tokens[b, :].nonzero()[0]
+            # iterate for the different values in seq_pair_mask, which will be
+            # either [0] or [0, 1], so loop over each seq in the seq pair (if any)
+            L, max_L = [], 0
+            for i in list(Counter(seq_pair_mask).keys()):
+                mask = seq_pair_mask == i
+                length = sum(mask)
+                connectivity_matrix = make_connectivity_matrix(length,
+                                                               span=self.span)
+                cl = cluster.AgglomerativeClustering(n_clusters=None,
+                                                     affinity="euclidean",
+                                                     memory=None,
+                                                     connectivity=connectivity_matrix,
+                                                     compute_full_tree=True,
+                                                     linkage="ward",
+                                                     distance_threshold=self.dist_threshold)
+                # This outputs an unordered cluster labelling:
+                # L_ = [4, 4, 1, 4, 1, 1, 0, 3, 2, 2, 3]
+                if filtered_embedding[mask].shape[0] > 1:
+                    L_ = cl.fit_predict(filtered_embedding[mask]).tolist()
+                else:  # agg clustering raises an error if there's only 1 point
+                    L_ = [0]
+                L_ = [i + max_L for i in L_]  # make labels in range(max_L+1, max(L_)+max_L+1)
+                # ugly extension for each sentence in the 'pair'.
+                # good thing this is extendable to more than pairs
+                L.extend(L_)
+                max_L = max(L) + 1
+            # Add isolated label for the special tokens in case
+            # those were prohibited to be clustered
+            # L = [5, 4, 4, 1, 4, 1, 1, 6, 0, 3, 2, 2, 3, 7]
+            for pos in idxs_filtered_out:
+                val = max(L) + 1  # new label for index
+                L.insert(pos, val)
             # Here we order and group the indices of the
             # vectors in tuple such that:
             # L -> [(0, 1, 3), (2, 4, 5), (6), (7, 10), (8, 9)]
@@ -173,7 +209,7 @@ class HardSpanChunker(nn.Module):
         self.id = nn.Identity()
         self.span = span
 
-    def forward(self, input, masks_dict=None, **kwargs):
+    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
         assert masks_dict is not None
         batch_size, _ = masks_dict['padding_mask'].size()
         lengths = masks_dict['padding_mask'].sum(dim=1)
@@ -186,7 +222,54 @@ class HardSpanChunker(nn.Module):
                 j += self.span
             indices_to_compact.append(idxs)
         return indices_to_compact
-
+"""
+    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
+        assert masks_dict is not None
+        if keep_special_tokens:
+            keep_mask = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
+        else:
+            keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach().cpu().numpy()
+        # Mask with 1s on tokens that are not regular only if
+        # keep_special_tokens=False, otherwise this will be 0s
+        special_tokens = (masks_dict['padding_mask'] - keep_mask).detach().cpu().numpy()
+        full_seq_pair_mask = masks_dict['seq_pair_mask'].detach().cpu().numpy()
+        indices_to_compact = []
+        # loop over each element in batch, I know. it's a shame this is sequential
+        for b, embeddings in enumerate(inp.detach().cpu().numpy()):
+            filtered_embedding = embeddings[keep_mask[b, :], :]
+            # remove pad and special tokens if necessary
+            seq_pair_mask = full_seq_pair_mask[b, keep_mask[b, :]]
+            # keep track of the indices that need to be added later
+            idxs_filtered_out = special_tokens[b, :].nonzero()[0]
+            # iterate for the different values in seq_pair_mask, which will be
+            # either [0] or [0, 1], so loop over each seq in the seq pair (if any)
+            L, max_L = [], 0
+            for i in list(Counter(seq_pair_mask).keys()):
+                mask = seq_pair_mask == i
+                length = sum(mask)
+                L_ = range(max_L, max_L)
+                L.extend(L_)
+                max_L = max(L) + 1
+            # Add isolated label for the special tokens in case
+            # those were prohibited to be clustered
+            # L = [5, 4, 4, 1, 4, 1, 1, 6, 0, 3, 2, 2, 3, 7]
+            for pos in idxs_filtered_out:
+                val = max(L) + 1  # new label for index
+                L.insert(pos, val)
+            # Here we order and group the indices of the
+            # vectors in tuple such that:
+            # L -> [(0, 1, 3), (2, 4, 5), (6), (7, 10), (8, 9)]
+            ordered_idxs = [()] * (max(L) + 1)
+            seen_clusters, cluster_dict, cluster_counter = [], {}, 0
+            for idx, cluster_ in enumerate(L):
+                if cluster_ not in seen_clusters:
+                    cluster_dict[str(cluster_)] = cluster_counter
+                    cluster_counter += 1
+                seen_clusters.append(cluster_)
+                pos = cluster_dict[str(cluster_)]
+                ordered_idxs[pos] += (idx,)
+            indices_to_compact.append(ordered_idxs)
+"""
 
 class IdentityChunker(nn.Module):
     """

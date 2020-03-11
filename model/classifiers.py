@@ -127,9 +127,9 @@ class AttentionClassifier(nn.Module):
         self.pool_mode = pool_mode
 
         # Define attention layers:
-        self.self_attend = Attention(embedding_dim, attention_type="general").to(device)
+        self.self_attend = Attention(embedding_dim, attention_type="general", device=device)  # .to(device)
 
-        self.attend = Attention(embedding_dim, attention_type="dot").to(device)
+        self.attend = Attention(embedding_dim, attention_type="dot", device=device)  # .to(device)
 
         # The linear layer that maps from embedding state space to sentiment classification space
         if self.pool_mode == "concat":
@@ -196,7 +196,7 @@ class ConvAttClassifier(nn.Module):
         # Define attention layers:
         self.conv1D = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=5, padding=2)  # padding=(kernel-1)/2
         self.skip_weight = nn.Parameter(torch.tensor(0.1, requires_grad=True))
-        self.attend = Attention(embedding_dim, attention_type="general").to(device)
+        self.attend = Attention(embedding_dim, attention_type="general", device=device)  # .to(device)
         self.classifier = nn.Linear(n_attention_vecs * embedding_dim, num_classes)
 
         # Loss function as negative log likelihood, which needs a logsoftmax input
@@ -214,9 +214,13 @@ class ConvAttClassifier(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
+    def forward(self, inp, pooling=None, masks_dict=None, keep_special_tokens=False, **kwargs):
         assert masks_dict is not None
-        mask = (masks_dict['padding_mask']).unsqueeze(-1).expand(inp.size()).to(self.device)
+        if keep_special_tokens:
+            mask = (masks_dict['padding_mask']).unsqueeze(-1).expand(inp.size()).to(self.device)
+        else:
+            mask = (masks_dict['regular_tokens_mask']).unsqueeze(-1).expand(inp.size()).to(self.device)
+        inp *= mask
 
         # concatenate along sequence length dimension so attention is calculated
         # along both positive and negative sentiments
@@ -225,9 +229,9 @@ class ConvAttClassifier(nn.Module):
         )  # expand for batch size
 
         # sequence is the input, transpose is to adapt for conv layer input convention
-        conv_out = self.conv1D(inp.transpose(1, 2)).transpose(1, 2)
+        conv_out = self.conv1D(inp.transpose(1, 2)).transpose(1, 2) * mask
         mix = (1 - self.skip_weight) * inp + self.skip_weight * conv_out
-        attention_seq, _ = self.attend(query, mix * mask)
+        attention_seq, _ = self.attend(query, mix, context_mask=mask)
 
         class_score = self.classifier(attention_seq.flatten(1))
         class_logscore = F.log_softmax(class_score, dim=1)
@@ -254,8 +258,8 @@ class DecAttClassifiter(nn.Module):
         self.pool_func = pool_func
 
         # Define 1 -> 2 attention layer
-        self.att12 = Attention(embedding_dim, attention_type="general").to(device)
-        self.att21 = Attention(embedding_dim, attention_type="general").to(device)
+        self.att12 = Attention(embedding_dim, attention_type="general", device=device)  # .to(device)
+        self.att21 = Attention(embedding_dim, attention_type="general", device=device)  # .to(device)
         self.classifier = nn.Linear(embedding_dim * 2, num_classes).to(device)
 
         # Cross entropy loss function that's fed with the log_scores (numerical stability)
@@ -264,18 +268,24 @@ class DecAttClassifiter(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, inp, masks_dict=None, **kwargs):
+    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
         assert masks_dict is not None
-        seq_pair_mask = masks_dict['seq_pair_mask']
 
-        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(inp.size()).to(self.device)
-        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(inp.size()).to(self.device)
+        mask_2 = (masks_dict['seq_pair_mask'] == 1)
+        mask_1 = (masks_dict['seq_pair_mask'] == 0)
+        if not keep_special_tokens:  # remove cls and sep tokens basically
+            mask_2 *= (masks_dict['regular_tokens_mask'] == 1)
+            mask_1 *= (masks_dict['regular_tokens_mask'] == 1)
+        mask_2 = mask_2.unsqueeze(-1).expand(inp.size()).to(self.device)
+        mask_1 = mask_1.unsqueeze(-1).expand(inp.size()).to(self.device)
+
         inp_tensor1 = inp * mask_1
         inp_tensor2 = inp * mask_2
 
-        att_seq1 = self.att12(inp_tensor1, inp_tensor2)[0] * mask_1
-        att_seq2 = self.att21(inp_tensor2, inp_tensor1)[0] * mask_2
+        att_seq1 = self.att12(inp_tensor1, inp_tensor2, query_mask=mask_1, context_mask=mask_2)[0] * mask_1
+        att_seq2 = self.att21(inp_tensor2, inp_tensor1, query_mask=mask_2, context_mask=mask_1)[0] * mask_2
 
+        # Watch out! if you do mean pooling, the padding might give problems!
         aggregation_seq1 = self.pool_func(att_seq1, dim=1)
         aggregation_seq2 = self.pool_func(att_seq2, dim=1)
 
@@ -302,9 +312,9 @@ class SeqPairAttentionClassifier(nn.Module):
         self.pool_mode = pool_mode
 
         # Define attention layers:
-        self.self_attend = Attention(embedding_dim, attention_type="general").to(device)
+        self.self_attend = Attention(embedding_dim, attention_type="general", device=device)  # .to(device)
 
-        self.attend = Attention(embedding_dim, attention_type="dot").to(device)
+        self.attend = Attention(embedding_dim, attention_type="dot", device=device)  # .to(device)
 
         # The linear layer that maps from embedding state space to sentiment classification space
         layer_multiplier = n_attention_vecs if self.pool_mode == "concat" else 1
@@ -425,9 +435,9 @@ class SeqPairFancyClassifier(nn.Module):
         self.device = device
 
         # Define attention layers:
-        self.self_attend = Attention(embedding_dim, attention_type="general").to(device)
+        self.self_attend = Attention(embedding_dim, attention_type="general", device=device)  # .to(device)
 
-        self.attend = Attention(embedding_dim, attention_type="dot").to(device)
+        self.attend = Attention(embedding_dim, attention_type="dot", device=device)  # .to(device)
 
         # Convolutional layer to filter attention weights
         self.conv1 = nn.Conv2d(
