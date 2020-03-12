@@ -9,7 +9,7 @@ SST2:
     train: './assets/datasets/SST2/train.tsv'
     test: './assets/datasets/SST2/test.tsv'
     dev: './assets/datasets/SST2/dev.tsv'
-  batch_size: 16
+  batch_size: 10
   classifier: 'ConvAttClassifier'
   get_batch_fn: !!python/name:model.data_utils.get_batch_SST2_from_indices # Loads function object
   counter: 0
@@ -20,7 +20,7 @@ QQP:
     train: './assets/datasets/QQP/train.tsv'
     test: './assets/datasets/QQP/test.tsv'
     dev: './assets/datasets/QQP/dev.tsv'
-  batch_size: 16
+  batch_size: 10
   classifier: 'DecAttClassifier'
   get_batch_fn: !!python/name:model.data_utils.get_batch_QQP_from_indices # Loads function object
   counter: 0
@@ -31,7 +31,7 @@ MNLI:
     train: './assets/datasets/MNLI/train.tsv'
     test: './assets/datasets/MNLI/test.tsv'
     dev: './assets/datasets/MNLI/dev.tsv'
-  batch_size: 16
+  batch_size: 10
   classifier: 'DecAttClassifier'
   get_batch_fn: !!python/name:model.data_utils.get_batch_MNLI_from_indices # Loads function object
   counter: 0
