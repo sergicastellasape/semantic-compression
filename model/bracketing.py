@@ -126,13 +126,13 @@ class AgglomerativeClusteringChunker(nn.Module):
     matrix. So the code is UGLY... but I needed to implement somehow the option to
     remove the special tokens and also prevent merging seq pairs...
     """
-    def __init__(self, threshold=0.9, span=4, device=torch.device("cpu")):
+    def __init__(self, threshold=0.9, max_skip=4, device=torch.device("cpu")):
         super().__init__()
         self.device = device
         # agg clustering wants distance not similarity
         # self.dist_threshold = 1 - threshold
         self.dist_threshold = threshold
-        self.span = span
+        self.span = max_skip
         self.id = nn.Identity()
 
     def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
@@ -143,7 +143,7 @@ class AgglomerativeClusteringChunker(nn.Module):
             keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach().cpu().numpy()
         # Mask with 1s on tokens that are not regular only if
         # mask_special_tokens=True, otherwise this will be 0s
-        special_tokens = (masks_dict['padding_mask'] - keep_mask).detach().cpu().numpy()
+        special_tokens = masks_dict['padding_mask'].detach().cpu().numpy() - keep_mask
         full_seq_pair_mask = masks_dict['seq_pair_mask'].detach().cpu().numpy()
         indices_to_compact = []
         # loop over each element in batch, I know. it's a shame this is sequential

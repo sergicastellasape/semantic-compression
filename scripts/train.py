@@ -71,6 +71,7 @@ print(f"Device being used: {device}")
 # Assign threshold if it was given in args
 sim_threshold = args.sim_threshold if args.sim_threshold != 666 else None
 span = args.span if args.span != 0 else None
+max_skip = args.max_skip if args.max_skip != 0 else None
 
 transformer_net = make_transformer(output_layer=-2,
                                    device=device)
@@ -78,6 +79,7 @@ bracketing_net = make_bracketer(name=args.chunker,
                                 device=device,
                                 sim_threshold=sim_threshold,
                                 dist_threshold=sim_threshold,
+                                max_skip=max_skip,
                                 span=span)
 generator_net = make_generator(pooling=args.pooling,
                                device=device)

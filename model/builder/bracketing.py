@@ -8,6 +8,7 @@ from ..bracketing import (
 def make_bracketer(name=None,
                    sim_threshold=None,
                    dist_threshold=None,
+                   max_skip=None,
                    span=None,
                    device=None):
 
@@ -26,7 +27,9 @@ def make_bracketer(name=None,
     elif name == 'agglomerative':
         print("Using AGGLOMERATIVE chunker")
         assert dist_threshold is not None, "Provide a valid threshold!"
+        assert max_skip is not None, "Provide a max skip as an argument in --max-skip!"
         bracketing_net = AgglomerativeClusteringChunker(threshold=dist_threshold,
+                                                        max_skip=max_skip,
                                                         device=device)
     elif name == 'hard':
         print("Using HARD SPAN chunker")

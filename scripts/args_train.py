@@ -34,6 +34,16 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--max-skip",
+    "-skip",
+    dest="max_skip",
+    type=int,
+    default=0,
+    required=False,
+    help="Max skip for Agglomerative Clustering.",
+)
+
+parser.add_argument(
     "--chunker",
     dest="chunker",
     type=str,
