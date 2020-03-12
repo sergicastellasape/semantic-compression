@@ -183,14 +183,16 @@ class ConvAttClassifier(nn.Module):
         self,
         embedding_dim,
         num_classes,
-        dropout=0.0,
+        dropout=0.3,
         n_attention_vecs=3,
         task=None,
+        mask_special_tokens=True,
         device=torch.device("cpu"),
     ):
         super().__init__()
         assert task is not None
         self.task = task
+        self.mask_special_tokens = mask_special_tokens
         self.device = device
 
         # Define attention layers:
@@ -214,9 +216,9 @@ class ConvAttClassifier(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, inp, pooling=None, masks_dict=None, keep_special_tokens=False, **kwargs):
+    def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
         assert masks_dict is not None
-        if keep_special_tokens:
+        if not self.mask_special_tokens:
             mask = (masks_dict['padding_mask']).unsqueeze(-1).expand(inp.size()).to(self.device)
         else:
             mask = (masks_dict['regular_tokens_mask']).unsqueeze(-1).expand(inp.size()).to(self.device)
@@ -250,10 +252,12 @@ class DecAttClassifiter(nn.Module):
                  dropout=0.3,
                  task=None,
                  pool_func=abs_max_pooling,
+                 mask_special_tokens=True,
                  device=torch.device('cpu')):
         super().__init__()
         assert task is not None
         self.task = task
+        self.mask_special_tokens = mask_special_tokens
         self.device = device
         self.pool_func = pool_func
 
@@ -268,12 +272,12 @@ class DecAttClassifiter(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
+    def forward(self, inp, masks_dict=None, **kwargs):
         assert masks_dict is not None
 
         mask_2 = (masks_dict['seq_pair_mask'] == 1)
         mask_1 = (masks_dict['seq_pair_mask'] == 0)
-        if not keep_special_tokens:  # remove cls and sep tokens basically
+        if self.mask_special_tokens:  # remove cls and sep tokens basically
             mask_2 *= (masks_dict['regular_tokens_mask'] == 1)
             mask_1 *= (masks_dict['regular_tokens_mask'] == 1)
         mask_2 = mask_2.unsqueeze(-1).expand(inp.size()).to(self.device)

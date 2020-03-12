@@ -135,14 +135,14 @@ class AgglomerativeClusteringChunker(nn.Module):
         self.span = span
         self.id = nn.Identity()
 
-    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
+    def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
         assert masks_dict is not None
-        if keep_special_tokens:
+        if not mask_special_tokens:
             keep_mask = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
         else:
             keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach().cpu().numpy()
         # Mask with 1s on tokens that are not regular only if
-        # keep_special_tokens=False, otherwise this will be 0s
+        # mask_special_tokens=True, otherwise this will be 0s
         special_tokens = (masks_dict['padding_mask'] - keep_mask).detach().cpu().numpy()
         full_seq_pair_mask = masks_dict['seq_pair_mask'].detach().cpu().numpy()
         indices_to_compact = []
@@ -209,67 +209,38 @@ class HardSpanChunker(nn.Module):
         self.id = nn.Identity()
         self.span = span
 
-    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
+    def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
         assert masks_dict is not None
-        batch_size, _ = masks_dict['padding_mask'].size()
-        lengths = masks_dict['padding_mask'].sum(dim=1)
-        indices_to_compact = []
-        for length in lengths:
-            idxs, j = [], 0
-            while j < length:
-                up_to = min(j + self.span, int(length))
-                idxs.append(list(range(j, up_to)))
-                j += self.span
-            indices_to_compact.append(idxs)
-        return indices_to_compact
-"""
-    def forward(self, inp, masks_dict=None, keep_special_tokens=False, **kwargs):
-        assert masks_dict is not None
-        if keep_special_tokens:
+        batch_size = inp.size(0)
+        if not mask_special_tokens:
             keep_mask = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
         else:
             keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach().cpu().numpy()
-        # Mask with 1s on tokens that are not regular only if
-        # keep_special_tokens=False, otherwise this will be 0s
-        special_tokens = (masks_dict['padding_mask'] - keep_mask).detach().cpu().numpy()
-        full_seq_pair_mask = masks_dict['seq_pair_mask'].detach().cpu().numpy()
         indices_to_compact = []
-        # loop over each element in batch, I know. it's a shame this is sequential
-        for b, embeddings in enumerate(inp.detach().cpu().numpy()):
-            filtered_embedding = embeddings[keep_mask[b, :], :]
-            # remove pad and special tokens if necessary
-            seq_pair_mask = full_seq_pair_mask[b, keep_mask[b, :]]
-            # keep track of the indices that need to be added later
-            idxs_filtered_out = special_tokens[b, :].nonzero()[0]
-            # iterate for the different values in seq_pair_mask, which will be
-            # either [0] or [0, 1], so loop over each seq in the seq pair (if any)
-            L, max_L = [], 0
-            for i in list(Counter(seq_pair_mask).keys()):
-                mask = seq_pair_mask == i
-                length = sum(mask)
-                L_ = range(max_L, max_L)
-                L.extend(L_)
-                max_L = max(L) + 1
-            # Add isolated label for the special tokens in case
-            # those were prohibited to be clustered
-            # L = [5, 4, 4, 1, 4, 1, 1, 6, 0, 3, 2, 2, 3, 7]
-            for pos in idxs_filtered_out:
-                val = max(L) + 1  # new label for index
-                L.insert(pos, val)
-            # Here we order and group the indices of the
-            # vectors in tuple such that:
-            # L -> [(0, 1, 3), (2, 4, 5), (6), (7, 10), (8, 9)]
-            ordered_idxs = [()] * (max(L) + 1)
-            seen_clusters, cluster_dict, cluster_counter = [], {}, 0
-            for idx, cluster_ in enumerate(L):
-                if cluster_ not in seen_clusters:
-                    cluster_dict[str(cluster_)] = cluster_counter
-                    cluster_counter += 1
-                seen_clusters.append(cluster_)
-                pos = cluster_dict[str(cluster_)]
-                ordered_idxs[pos] += (idx,)
+        for b in range(batch_size):
+            # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
+            m = keep_mask[b, :]
+            start_stop = [0]
+            s = [start_stop.append(i) for i in range(1, len(m)) if m[i] != m[i - 1]]
+            # start_stop = [0, 1, 4, 5, 12] ; where the switches happen
+            if m[-1] == 1:
+                # if the last mask is a 1 also add it,
+                # else not necessary cause it's padding
+                start_stop.append(len(m))
+            ordered_idxs = []
+            for i in range(len(start_stop) - 1):
+                start = start_stop[i]
+                stop = start_stop[i + 1]
+                L_ = list(range(start, stop + 1, self.span))
+                if max(L_) < stop:
+                    L_.append(stop)
+                # L_ = [0, 1]; [1, 4]; [4, 5]; etc. the 'ranges' to merge
+                L = [tuple(range(L_[i], L_[i + 1])) for i in range(len(L_) - 1)]
+                ordered_idxs.extend(L)
+            # ordered_idxs = [(0,), (1, 2, 3), (4,), (5, 6, 7), (8, 9, 10), (11,)]
             indices_to_compact.append(ordered_idxs)
-"""
+        return indices_to_compact
+
 
 class IdentityChunker(nn.Module):
     """

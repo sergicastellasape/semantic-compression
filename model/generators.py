@@ -56,20 +56,25 @@ class EmbeddingGenerator:
                     tensors_batch[b, idx_tuple, :].unsqueeze(0))
                 compact_tensors_batch[b, i, :] = joint
 
-                # update compact masks
-                # only if all are 0s (pad tokens) add it to the padding mask and
-                if masks_dict["padding_mask"][b, idx_tuple].sum() == 0:
-                    mask_padding[b, i] = 0
-                    mask_seq_pair[b, i] = -1
-                else:
+                assert masks_dict["padding_mask"][b, idx_tuple].bool().any() == masks_dict["padding_mask"][b, idx_tuple].bool().all()
+                assert masks_dict["seq_pair_mask"][b, idx_tuple].bool().any() == masks_dict["seq_pair_mask"][b, idx_tuple].bool().all()
+                assert masks_dict["regular_tokens_mask"][b, idx_tuple].bool().any() == masks_dict["regular_tokens_mask"][b, idx_tuple].bool().all()
+
+                # update compact masks. Given the guarantees from the bracketing to
+                # not mix padding, regular and special tokens, the 'loose' criteria
+                # can be assumed to be 'hard'
+                # if any of the tokens is not padding (0s), add it as non-padding (1s)
+                if masks_dict["padding_mask"][b, idx_tuple].sum() != 0:
                     mask_padding[b, i] = 1
                 # if some tokens are "regular" add the index to the mask
                 if masks_dict["regular_tokens_mask"][b, idx_tuple].sum() != 0:
                     mask_regular_tokens[b, i] = 1
-                # if all tokens belong to second sequence, add it to the mask seq pair
-                if masks_dict["seq_pair_mask"][b, idx_tuple].prod() == 1:
+                # if no token belongs to the first sequence, add it to the mask seq pair
+                # we deal with the padding mask for 'seq_pair' later
+                if masks_dict["seq_pair_mask"][b, idx_tuple].prod() != 0:
                     mask_seq_pair[b, i] = 1
 
+        mask_seq_pair[mask_padding == 0] = -1.
         # To remove the dimensions in the sequence length where all the sequences are now padded because
         # of the compression
         all_padding_elements = mask_padding.sum(dim=0) == 0  # True where ALL elements were kept unchanged

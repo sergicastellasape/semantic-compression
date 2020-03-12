@@ -68,6 +68,7 @@ def make_DecAttClassifier(num_classes=None, task=None, device=None):
                              dropout=0.3,
                              task=task,
                              pool_func=abs_max_pooling,
+                             mask_special_tokens=True,
                              device=device)
 
 
@@ -80,6 +81,7 @@ def make_ConvAttClassifier(num_classes=None, task=None, device=None):
                              dropout=0.3,
                              task=task,
                              n_attention_vecs=3,
+                             mask_special_tokens=True,
                              device=device)
 
 
