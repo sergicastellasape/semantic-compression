@@ -15,7 +15,7 @@ class Transformer(nn.Module):
         device=torch.device("cpu"),
     ):
         super(Transformer, self).__init__()
-        self.device = device  # stupid comment
+        self.device = device
         self.model = model_class.from_pretrained(
             pre_trained_weights, output_hidden_states=True
         )
@@ -44,7 +44,7 @@ class Transformer(nn.Module):
 
         batch_input_ids = encoded_inputs_dict["input_ids"]
 
-        # get maximum sequence length for padding, the +3 is to account for the [CLS] and [SEP] tokens added
+        # get maximum sequence length in the batch to add extra padding
         max_length = max([len(seq) for seq in batch_input_ids])
 
         # add -1 to identify the padding part
