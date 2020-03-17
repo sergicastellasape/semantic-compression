@@ -143,8 +143,9 @@ global_counter, batch_loss, max_acc = 0, 0, 0
 ##########################################################################
 ########################### ACUTAL TRAINING ##############################
 initial_time = time.time()
+params = list(multitask_net.parameters()) + list(generator_net.parameters())
 optimizer = torch.optim.Adam(
-    multitask_net.parameters(),
+    params,
     lr=args.lr,
     betas=(0.9, 0.999),
     eps=1e-08,
@@ -194,6 +195,8 @@ while not finished_training:
 
     # Forward pass
     model.train()
+    model.transformer.eval()
+
     batch_predictions = model.forward(batch_sequences,
                                       batch_slices=batch_slices,
                                       compression=args.train_comp,
@@ -209,7 +212,7 @@ while not finished_training:
     L.backward()
     optimizer.step()
     batch_loss += L.item()
-    if (global_counter % eval_periodicity == 0):  #and (global_counter != 0):
+    if (global_counter % eval_periodicity == 0) and (global_counter != 0):
         print(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )

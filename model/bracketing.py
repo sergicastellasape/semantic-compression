@@ -223,10 +223,8 @@ class HardSpanChunker(nn.Module):
             start_stop = [0]
             s = [start_stop.append(i) for i in range(1, len(m)) if m[i] != m[i - 1]]
             # start_stop = [0, 1, 4, 5, 12] ; where the switches happen
-            if m[-1] == 1:
-                # if the last mask is a 1 also add it,
-                # else not necessary cause it's padding
-                start_stop.append(len(m))
+            start_stop.append(len(m))  # add last element
+
             ordered_idxs = []
             for i in range(len(start_stop) - 1):
                 start = start_stop[i]

@@ -46,7 +46,9 @@ class End2EndModel(nn.Module):
 
         if compression:
             indices = self.bracketer.forward(
-                context_representation, masks_dict=masks_dict
+                context_representation,
+                masks_dict=masks_dict,
+                mask_special_tokens=True,
             )
             (
                 compact_representation,
