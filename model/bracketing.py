@@ -223,7 +223,11 @@ class HardSpanChunker(nn.Module):
             start_stop = [0]
             s = [start_stop.append(i) for i in range(1, len(m)) if m[i] != m[i - 1]]
             # start_stop = [0, 1, 4, 5, 12] ; where the switches happen
-            start_stop.append(len(m))  # add last element
+            if m[-1] == 1:  # [......1]
+                start_stop.append(len(m))  # add last element if it's beefy
+            else:           # [......0]
+                # add 1 step for final <sep> token, useful for qualitative analysis
+                start_stop.append(max(start_stop) + 1)
 
             ordered_idxs = []
             for i in range(len(start_stop) - 1):
