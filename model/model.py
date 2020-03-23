@@ -45,24 +45,20 @@ class End2EndModel(nn.Module):
         )
 
         if compression:
-            indices = self.bracketer.forward(
-                context_representation,
-                masks_dict=masks_dict,
-                mask_special_tokens=True,
-            )
+            indices = self.bracketer.forward(context_representation,
+                                             masks_dict=masks_dict,
+                                             mask_special_tokens=True)
             (
                 compact_representation,
                 compact_masks_dict,
                 comp_rate,
-            ) = self.generator.forward(
-                context_representation, indices, masks_dict=masks_dict
-            )
+            ) = self.generator.forward(context_representation,
+                                       indices,
+                                       masks_dict=masks_dict)
         else:
             comp_rate = 1
-            compact_representation, compact_masks_dict = (
-                context_representation,
-                masks_dict,
-            )
+            compact_representation = context_representation
+            compact_masks_dict = masks_dict
 
         output = self.multitasknet.forward(
             compact_representation,
@@ -72,7 +68,8 @@ class End2EndModel(nn.Module):
         if return_comp_rate:
             return output, comp_rate
         else:
-            return output  # list of tensors, each tensor is the model prediction for each task
+            # dict of tensors, each tensor is the model prediction for each task
+            return output
 
     def loss(self, batch_prediction, batch_targets, weights=None):
         return self.multitasknet.loss(batch_prediction, batch_targets, weights=weights)

@@ -286,8 +286,14 @@ class DecAttClassifiter(nn.Module):
         inp_tensor1 = inp * mask_1
         inp_tensor2 = inp * mask_2
 
-        att_seq1 = self.att12(inp_tensor1, inp_tensor2, query_mask=mask_1, context_mask=mask_2)[0] * mask_1
-        att_seq2 = self.att21(inp_tensor2, inp_tensor1, query_mask=mask_2, context_mask=mask_1)[0] * mask_2
+        att_seq1 = self.att12(inp_tensor1,
+                              inp_tensor2,
+                              query_mask=mask_1,
+                              context_mask=mask_2)[0] * mask_1
+        att_seq2 = self.att21(inp_tensor2,
+                              inp_tensor1,
+                              query_mask=mask_2,
+                              context_mask=mask_1)[0] * mask_2
 
         # Watch out! if you do mean pooling, the padding might give problems!
         aggregation_seq1 = self.pool_func(att_seq1, dim=1)
@@ -489,9 +495,9 @@ class SeqPairFancyClassifier(nn.Module):
         assert masks_dict is not None
         seq_pair_mask = masks_dict['seq_pair_mask']
         batch_size = input.size(0)
-        # seq_pair_mask looks like [00000000001111111111] so for the second sentence
-        # one needs to multiply by the mask and for the first one it's the negation
-        # print('seq pair original mask:', seq_pair_mask[0, :])
+        # seq_pair_mask looks like [00000000001111111111] so for the second
+        # sentence one needs to multiply by the mask and for the first one it's
+        # the negation print('seq pair original mask:', seq_pair_mask[0, :])
         mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
         mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size()).to(self.device)
 

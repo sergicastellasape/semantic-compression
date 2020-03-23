@@ -85,8 +85,8 @@ def make_ConvAttClassifier(num_classes=None, task=None, device=None):
                              device=device)
 
 
-# If you want to make a new classifier, add the function and the reference here with the
-# corresponding reference in the config/datasets.yml
+# If you want to make a new classifier, add the function and the reference here
+# with the corresponding reference in the config/datasets.yml
 classifiers_dict = {
     'BiLSTMClassifier': make_BiLSTMClassifier,
     'AttentionClassifier': make_AttentionClassifier,

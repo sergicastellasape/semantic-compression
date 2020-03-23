@@ -51,15 +51,19 @@ class EmbeddingGenerator(nn.Module):
 
         for b, chunk_indices in enumerate(indices_batch):
             for i, idx_tuple in enumerate(chunk_indices):
-                # for each group calculate the compacted with "pool_function" (which will eventually
-                # be something more complex, not just max pooling)
+                # Apply pooling function for the group of tensors
                 joint = self.pool_function(
                     tensors_batch[b, idx_tuple, :].unsqueeze(0))
                 compact_tensors_batch[b, i, :] = joint.requires_grad_(True)
 
-                assert masks_dict["padding_mask"][b, idx_tuple].bool().any() == masks_dict["padding_mask"][b, idx_tuple].bool().all()
-                assert masks_dict["seq_pair_mask"][b, idx_tuple].bool().any() == masks_dict["seq_pair_mask"][b, idx_tuple].bool().all()
-                assert masks_dict["regular_tokens_mask"][b, idx_tuple].bool().any() == masks_dict["regular_tokens_mask"][b, idx_tuple].bool().all()
+                # Make sure we're not mixing up regular tokens, special tokens
+                # and padding tokens.
+                assert masks_dict["padding_mask"][b, idx_tuple].bool().any() ==\
+                    masks_dict["padding_mask"][b, idx_tuple].bool().all()
+                assert masks_dict["seq_pair_mask"][b, idx_tuple].bool().any() ==\
+                    masks_dict["seq_pair_mask"][b, idx_tuple].bool().all()
+                assert masks_dict["regular_tokens_mask"][b, idx_tuple].bool().any() ==\
+                    masks_dict["regular_tokens_mask"][b, idx_tuple].bool().all()
 
                 # update compact masks. Given the guarantees from the bracketing to
                 # not mix padding, regular and special tokens, the 'loose' criteria
@@ -76,8 +80,8 @@ class EmbeddingGenerator(nn.Module):
                     mask_seq_pair[b, i] = 1
 
         mask_seq_pair[mask_padding == 0] = -1.
-        # To remove the dimensions in the sequence length where all the sequences are now padded because
-        # of the compression
+        # To remove the dimensions in the sequence length where all the
+        # sequences are now padded because of the compression
         all_padding_elements = mask_padding.sum(dim=0) == 0  # True where ALL elements were kept unchanged
         mask_remove_unnecessary_padding = ~all_padding_elements
         compact_dict = {
@@ -128,14 +132,16 @@ class ParamEmbeddingGenerator(nn.Module):
 
         for b, chunk_indices in enumerate(indices_batch):
             for i, idx_tuple in enumerate(chunk_indices):
-                # for each group calculate the compacted with "pool_function" (which will eventually
-                # be something more complex, not just max pooling)
+                # Forward pass on Generator Net for group of tensors
                 joint = self.gen_net(tensors_batch[b, idx_tuple, :].unsqueeze(0))
                 compact_tensors_batch[b, i, :] = joint
 
-                assert masks_dict["padding_mask"][b, idx_tuple].bool().any() == masks_dict["padding_mask"][b, idx_tuple].bool().all()
-                assert masks_dict["seq_pair_mask"][b, idx_tuple].bool().any() == masks_dict["seq_pair_mask"][b, idx_tuple].bool().all()
-                assert masks_dict["regular_tokens_mask"][b, idx_tuple].bool().any() == masks_dict["regular_tokens_mask"][b, idx_tuple].bool().all()
+                assert masks_dict["padding_mask"][b, idx_tuple].bool().any() ==\
+                    masks_dict["padding_mask"][b, idx_tuple].bool().all()
+                assert masks_dict["seq_pair_mask"][b, idx_tuple].bool().any() ==\
+                    masks_dict["seq_pair_mask"][b, idx_tuple].bool().all()
+                assert masks_dict["regular_tokens_mask"][b, idx_tuple].bool().any() ==\
+                    masks_dict["regular_tokens_mask"][b, idx_tuple].bool().all()
 
                 # update compact masks. Given the guarantees from the bracketing to
                 # not mix padding, regular and special tokens, the 'loose' criteria
@@ -152,8 +158,8 @@ class ParamEmbeddingGenerator(nn.Module):
                     mask_seq_pair[b, i] = 1
 
         mask_seq_pair[mask_padding == 0] = -1.
-        # To remove the dimensions in the sequence length where all the sequences are now padded because
-        # of the compression
+        # To remove the dimensions in the sequence length where all the
+        # sequences are now padded because of the compression
         all_padding_elements = mask_padding.sum(dim=0) == 0  # True where ALL elements were kept unchanged
         mask_remove_unnecessary_padding = ~all_padding_elements
         compact_dict = {

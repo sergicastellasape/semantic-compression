@@ -82,9 +82,11 @@ def make_connectivity_matrix(length, span=1):
     ).toarray()
     return connectivity_matrix
 
+
 def compression2euclideandist(compression):
     distance_threshold = None
     return distance_threshold
+
 
 def add_space_to_special_characters(string, characters=[]):
     for char in characters:
@@ -106,8 +108,8 @@ def filter_indices(indices_batch):
 
 def expand_indices(indices_batch, target_lengths):
     """
-    Adds a leading indices in tuples (i.e. (0,)) to the list of indices if it's missing
-    and the same for the last indices
+    Adds a leading indices in tuples (i.e. (0,)) to the list of indices if it's
+    missing and the same for the last indices
     """
 
     assert len(indices_batch) == len(target_lengths)
@@ -126,7 +128,6 @@ def expand_indices(indices_batch, target_lengths):
     return indices_batch
 
 
-# Print time since t
 def time_since(t, message):
     print(message, time.time() - t)
 
@@ -163,7 +164,7 @@ def abs_max_pooling(T, dim=1):
         .transpose(dim, -1)
         .type(torch.float)
     )
-    # multily original with one hot to apply mask and then sum over the dimension
+    # multily original with 1-hot to apply mask and then sum over the dimension
     max_abs_tensor = torch.mul(T, one_hot).sum(dim=dim)
     return max_abs_tensor
 
@@ -172,7 +173,10 @@ def mean_pooling(T, dim=1):
     return T.mean(dim=1)
 
 
-def hotfix_pack_padded_sequence(inp, lengths, batch_first=False, enforce_sorted=True):
+def hotfix_pack_padded_sequence(inp,
+                                lengths,
+                                batch_first=False,
+                                enforce_sorted=True):
     lengths = torch.as_tensor(lengths, dtype=torch.int64)
     lengths = lengths.cpu()
     if enforce_sorted:

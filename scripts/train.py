@@ -52,8 +52,8 @@ with open("./config/model.yml", "r") as file:
 # modify the datasets according to the arg passed
 config["datasets"] = args.datasets
 
-#############################################################################
-############################### LOAD DATASETS ###############################
+################################################################################
+################################ LOAD DATASETS #################################
 print("Loading datasets...")
 dataframes = {}
 for dataset in config["datasets"]:
@@ -62,8 +62,8 @@ for dataset in config["datasets"]:
         dataframes[dataset][kind] = pd.read_csv(
             config[dataset]["path"][kind], sep="\t")
 
-#############################################################################
-############################### LOAD MODELS #################################
+################################################################################
+################################# LOAD MODELS ##################################
 device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
 print(f"Device being used: {device}")
@@ -75,14 +75,17 @@ max_skip = args.max_skip if args.max_skip != 0 else None
 
 transformer_net = make_transformer(output_layer=-2,
                                    device=device)
+
 bracketing_net = make_bracketer(name=args.chunker,
                                 device=device,
                                 sim_threshold=sim_threshold,
                                 dist_threshold=sim_threshold,
                                 max_skip=max_skip,
                                 span=span)
+
 generator_net = make_generator(pooling=args.pooling,
                                device=device)
+
 multitask_net = make_multitask_net(datasets=args.datasets,
                                    config=config,
                                    device=device)
@@ -94,8 +97,8 @@ model = End2EndModel(transformer=transformer_net,
                      device=device).to(device)
 
 
-##########################################################################
-########################## DEFINE CONSTANTS ##############################
+################################################################################
+############################## DEFINE CONSTANTS ################################
 torch.manual_seed(0)
 LOG_DIR = args.log_dir
 run_identifier = args.run_id
@@ -140,8 +143,8 @@ batch_indices = {}
 global_counter, batch_loss, max_acc = 0, 0, 0
 
 
-##########################################################################
-########################### ACUTAL TRAINING ##############################
+################################################################################
+############################### ACUTAL TRAINING ################################
 initial_time = time.time()
 params = list(multitask_net.parameters()) + list(generator_net.parameters())
 optimizer = torch.optim.Adam(
@@ -186,8 +189,8 @@ while not finished_training:
                               {dataset}: {L}, indices: {batch_indices[dataset][idx, :]}"
             )
 
-        # Big list combining the input sequences/ tuple of sequences because the batch needs
-        # to be at the same "depth" level
+        # Big list combining the input sequences/ tuple of sequences because
+        # the batch needs to be at the same "depth" level
         batch_sequences.extend([data[0] for data in dataset_batch])
         batch_slices[dataset] = slice(j, j + len(dataset_batch))
         j += len(dataset_batch)
@@ -241,7 +244,8 @@ while not finished_training:
         print(f"Compression Rates:", compression_dict)
         batch_loss, t = 0, time.time()
         # Log to tensorboard
-        writer.add_scalars(f"metrics/dev/{run_identifier}", metrics_dict, global_counter)
+        writer.add_scalars(f"metrics/dev/{run_identifier}",
+                           metrics_dict, global_counter)
     global_counter += 1
     finished_training = True if (
         time.time() - initial_time) > args.walltime else False
