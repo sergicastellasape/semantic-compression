@@ -242,9 +242,9 @@ while not finished_training:
             max_acc = avg_acc
             logging.info("NEW CHECKPOINT SAVED!")
 
-        logging.info("Eval metrics:", metrics_dict)
+        logging.info(f"Eval metrics: {metrics_dict}")
         logging.info(f"Global Loss: {batch_loss/eval_periodicity}")
-        logging.info(f"Compression Rates:", compression_dict)
+        logging.info(f"Compression Rates: {compression_dict}")
         batch_loss, t = 0, time.time()
         # Log to tensorboard
         writer.add_scalars(f"metrics/dev/{run_identifier}",
@@ -270,5 +270,5 @@ if args.full_test_eval:
         return_comp_rate=True,
         device=device,
     )
-    logging.info("Full test set losses: ", metrics_dict)
+    logging.info(f"Full test set losses: {metrics_dict}")
     writer.add_scalars(f"metrics/test/{run_identifier}", metrics_dict, 0)
