@@ -4,6 +4,7 @@ import yaml
 import time
 import gc
 import datetime
+import logging
 import os
 import sys
 
@@ -37,11 +38,13 @@ from model.utils import (
 
 # Import comand line arguments
 from args_train import args
-
-if args.load_checkpoint:
-    assert os.path.exists(
-        f"./assets/checkpoints/{args.run_id}.pt"
-    ), "Checkpoint for run_id doesn't exist!"
+log_level = {
+    'debug': logging.DEBUG,
+    'info': logging.INFO,
+    'warning': logging.WARNING
+}
+logging.basicConfig(level=log_level[args.log_level])
+logging.getLogger("transformers").setLevel(logging.WARNING)
 
 # load config file from datasets
 with open("./config/datasets.yml", "r") as file:
@@ -54,7 +57,7 @@ config["datasets"] = args.datasets
 
 ################################################################################
 ################################ LOAD DATASETS #################################
-print("Loading datasets...")
+logging.info(f"Loading datasets: {args.datasets}")
 dataframes = {}
 for dataset in config["datasets"]:
     dataframes[dataset] = {}
@@ -66,7 +69,7 @@ for dataset in config["datasets"]:
 ################################# LOAD MODELS ##################################
 device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
-print(f"Device being used: {device}")
+logging.info(f"DEVICE: {device}")
 
 # Assign threshold if it was given in args
 sim_threshold = args.sim_threshold if args.sim_threshold != 666 else None
@@ -96,6 +99,8 @@ model = End2EndModel(transformer=transformer_net,
                      multitasknet=multitask_net,
                      device=device).to(device)
 
+logging.info(f"Compression in Training: {args.train_comp}")
+logging.info(f"Compression in Evaluation: {args.eval_comp}")
 
 ################################################################################
 ############################## DEFINE CONSTANTS ################################
@@ -105,19 +110,13 @@ run_identifier = args.run_id
 eval_periodicity = args.evalperiod
 
 # Tensorboard init
-writer = SummaryWriter(
-    log_dir=os.path.join(LOG_DIR, run_identifier), comment=args.tensorboard_comment
-)
+writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, run_identifier))
 
-checkpoints_path = os.path.join(
-    "./assets/checkpoints/", f"{run_identifier}.pt")
-if args.load_checkpoint:
-    print(f'Loading checkpoint from {checkpoints_path}')
-    model.load_state_dict(torch.load(checkpoints_path))
 
-# Create checkpoints dir if it doesn't exist yet
-if not os.path.exists('./assets/checkpoints'):
-    os.makedirs('./assets/checkpoints')
+# Load checkpoint from modules in --load-modules argument
+model.load_modules(args.checkpoint_id,
+                   modules=args.modules_to_load,
+                   parent_path='./assets/checkpoints')
 
 # LOAD CONFIG DICTS AND CREATE NEW ONES FROM THOSE
 counter = {dataset: config[dataset]["counter"]
@@ -162,7 +161,7 @@ while not finished_training:
     # Reset counter for dataset if it's been finished
     for dataset in config["datasets"]:
         if counter[dataset] >= n_batches[dataset] or global_counter == 0:
-            print(f"NEW EPOCH STARTED FOR DATASET {dataset}!")
+            logging.info(f"NEW EPOCH STARTED FOR DATASET {dataset}!")
             counter[dataset] = 0
             batch_indices[dataset] = None
             torch.cuda.empty_cache()
@@ -206,27 +205,29 @@ while not finished_training:
                                       return_comp_rate=False)
     L = model.loss(batch_predictions, batch_targets, weights=None)
     metrics = model.metrics(batch_predictions, batch_targets)
-    # print('training metrics:', metrics)
+
     # Log to tensorboard
     writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_counter)
     writer.add_scalars(f"metrics/train/{run_identifier}", metrics, global_counter)
+
     # Update net
     optimizer.zero_grad()
     L.backward()
     optimizer.step()
     batch_loss += L.item()
-    if (global_counter % eval_periodicity == 0) and (global_counter != 0):
-        print(
+
+    if (global_counter % eval_periodicity == 0):  # and (global_counter != 0):
+        logging.info(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
-        print(f"Iterations per second: {eval_periodicity/(time.time()-t)}")
-        # evaluate on dev sets
+        logging.info(f"Iterations per second: {eval_periodicity/(time.time()-t)}")
+        # Evaluate on dev sets
         model.eval()
         metrics_dict, compression_dict = eval_model_on_DF(
             model,
             dev_dataframes_dict,
             get_batch_function,
-            batch_size=16,
+            batch_size=32,
             global_counter=global_counter,
             compression=args.eval_comp,
             return_comp_rate=True,
@@ -235,13 +236,15 @@ while not finished_training:
         avg_acc = sum(metrics_dict.values()) / len(metrics_dict)
         if avg_acc > max_acc:
             torch.cuda.empty_cache()
-            torch.save(model.state_dict(), checkpoints_path)
+            model.save_modules(args.run_id,
+                               modules=args.modules_to_save,
+                               parent_path='./assets/checkpoints/')
             max_acc = avg_acc
-            print("NEW CHECKPOINT SAVED!")
+            logging.info("NEW CHECKPOINT SAVED!")
 
-        print("Eval metrics:", metrics_dict)
-        print(f"Global Loss: {batch_loss/eval_periodicity}")
-        print(f"Compression Rates:", compression_dict)
+        logging.info("Eval metrics:", metrics_dict)
+        logging.info(f"Global Loss: {batch_loss/eval_periodicity}")
+        logging.info(f"Compression Rates:", compression_dict)
         batch_loss, t = 0, time.time()
         # Log to tensorboard
         writer.add_scalars(f"metrics/dev/{run_identifier}",
@@ -251,9 +254,11 @@ while not finished_training:
         time.time() - initial_time) > args.walltime else False
 
 if args.full_test_eval:
-    print("########## FINAL EVAL ON FULL TEST SET #############")
-    # load best checkpoint
-    model.load_state_dict(torch.load(checkpoints_path))
+    logging.info("########## FINAL EVAL ON FULL TEST SET #############")
+    # load 'best' checkpoint (according to dev set)
+    model.load_modules(args.run_id,
+                       modules=args.modules_to_save,
+                       parent_path='./assets/checkpoints/')
     model.eval()
     metrics_dict, compression_dict = eval_model_on_DF(
         model,
@@ -265,5 +270,5 @@ if args.full_test_eval:
         return_comp_rate=True,
         device=device,
     )
-    print("Full test set losses: ", metrics_dict)
+    logging.info("Full test set losses: ", metrics_dict)
     writer.add_scalars(f"metrics/test/{run_identifier}", metrics_dict, 0)

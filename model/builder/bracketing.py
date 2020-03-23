@@ -1,3 +1,4 @@
+import logging
 from ..bracketing import (
     NNSimilarityChunker,
     AgglomerativeClusteringChunker,
@@ -16,7 +17,7 @@ def make_bracketer(name=None,
     assert name is not None
 
     if name == 'NNSimilarity':
-        print("Using NNsimilarity chunker")
+        logging.info("BRACKETER: NNSimilarity")
         assert sim_threshold is not None, "Provide a valid threshold!"
         bracketing_net = NNSimilarityChunker(sim_function=cos,
                                              threshold=sim_threshold,
@@ -25,14 +26,14 @@ def make_bracketer(name=None,
                                              chunk_size_limit=60,
                                              device=device)
     elif name == 'agglomerative':
-        print("Using AGGLOMERATIVE chunker")
+        logging.info("BRACKETER: Agglomerative")
         assert dist_threshold is not None, "Provide a valid threshold!"
         assert max_skip is not None, "Provide a max skip as an argument in --max-skip!"
         bracketing_net = AgglomerativeClusteringChunker(threshold=dist_threshold,
                                                         max_skip=max_skip,
                                                         device=device)
     elif name == 'hard':
-        print("Using HARD SPAN chunker")
+        logging.info("BRACKETER: Hard Span")
         assert span != 0, "Provide a valid span!"
         bracketing_net = HardSpanChunker(span=span,
                                          device=device)

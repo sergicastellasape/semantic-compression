@@ -3,6 +3,7 @@ Main wrappers that implement the rest of the parts of the model: the initial com
 sequentially (transformer + bracketer + generator) plus the multitask networks that
 operate "in parallel"
 """
+import os
 import torch.nn as nn
 import torch
 
@@ -28,7 +29,8 @@ class End2EndModel(nn.Module):
         self.bracketer = bracketer
         self.generator = generator
         self.multitasknet = multitasknet
-        self.trainable_modules = trainable_modules  # not implemented yet
+        self.allowed_modules = ['transformer', 'bracketer',
+                                'generator', 'multitasknet']
 
     def forward(
         self,
@@ -76,6 +78,42 @@ class End2EndModel(nn.Module):
 
     def metrics(self, predictions, targets):
         return self.multitasknet.metrics(predictions, targets)
+
+    def save_modules(self,
+                     checkpoint_id,
+                     modules=['generator', 'multitask'],
+                     parent_path='./assets/checkpoints/'):
+
+        assert all(module in self.allowed_modules for module in modules),\
+            "Invalid module provided"
+
+        if not os.path.exists(parent_path):
+            os.makedirs(parent_path)
+
+        for module in modules:
+            path = os.path.join(parent_path, module)
+            if not os.path.exists(path):
+                os.makedirs(path)
+            module_state_dict = getattr(self, module).state_dict()
+            checkpoint_path = os.path.join(path, f'{checkpoint_id}.pt')
+            torch.save(module_state_dict, checkpoint_path)
+
+    def load_modules(self,
+                     checkpoint_id,
+                     modules=['generator', 'multitask'],
+                     parent_path='./assets/checkpoints'):
+
+        assert all(module in self.allowed_modules for module in modules),\
+            "Invalid module provided"
+
+        for module in modules:
+            path = os.path.join(parent_path, module)
+            checkpoint_path = os.path.join(path, f'{checkpoint_id}.pt')
+            assert os.path.exists(checkpoint_path),\
+                f"Checkpoint for {module}: {checkpoint_id} does not exist!"
+            getattr(self, module).load_state_dict(
+                torch.load(checkpoint_path, map_location=self.device)
+            )
 
 
 class MultiTaskNet(nn.Module):

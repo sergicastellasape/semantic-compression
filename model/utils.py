@@ -1,11 +1,12 @@
 """
 Collection of useful little functions.
 """
-import re
-import time
 import argparse
 from collections import defaultdict
+import re
+import time
 from tqdm import tqdm
+
 import math
 import numpy as np
 import scipy
@@ -209,5 +210,12 @@ def str2bool(v):
 
 
 def str2list(string):
-    return [x.strip('[').strip(' ').strip(']')
-            for x in string.split(',')]
+    clean = string.strip('[') \
+                  .strip(' ') \
+                  .strip(']') \
+                  .strip("'") \
+                  .strip('"')
+    if clean == '':  # 'weird' behaviour of .split with empty strings
+        return []
+    else:
+        return clean.split(',')
