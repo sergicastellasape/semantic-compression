@@ -3,6 +3,8 @@ sys.path.append(".")
 import argparse
 from model.utils import str2bool, str2list
 
+LOGGING_PATH = './logging'
+
 parser = argparse.ArgumentParser(description="Model Options")
 parser.add_argument(
     "--run-identifier",
@@ -146,7 +148,7 @@ parser.add_argument(
     "--datasets",
     "-dts",
     required=False,
-    default='[SST2, QQP]',
+    default='[SST2, QQP, MNLI]',
     type=str2list,
     dest="datasets",
     help="Set the datasets to train on.",

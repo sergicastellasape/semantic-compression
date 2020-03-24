@@ -37,13 +37,22 @@ from model.utils import (
 )
 
 # Import comand line arguments
-from args_train import args
+from args_train import args, LOGGING_PATH
 log_level = {
     'debug': logging.DEBUG,
     'info': logging.INFO,
     'warning': logging.WARNING
 }
-logging.basicConfig(level=log_level[args.log_level])
+
+if not os.path.exists(LOGGING_PATH):
+    os.makedirs(LOGGING_PATH)
+
+logging.basicConfig(filename=os.path.join(LOGGING_PATH, f'{args.run_id}.txt'),
+                    filemode='a',
+                    format='%(asctime)s | %(levelname)s : %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=log_level[args.log_level])
+
 logging.getLogger("transformers").setLevel(logging.WARNING)
 
 # load config file from datasets
