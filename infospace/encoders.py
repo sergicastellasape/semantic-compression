@@ -1,3 +1,8 @@
+"""
+Encoder models: everything that outputs things that are in the information space
+(or potentially some other transformed/learned space). InfoCoder is the first.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,8 +25,8 @@ class InfoCoder(nn.Module):
 
     def loss(self, info_embeddings, target_similarity):
         # info_embeddings.size() = batch, len, embedding_dim
+        # pairwise_sim = batch, len, len
         pairwise_sim = self.cosine_sim(
             info_embeddings.unsqueeze(-2),
             info_embeddings.unsqueeze(-3)
         )
-
