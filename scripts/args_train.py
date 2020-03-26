@@ -3,6 +3,8 @@ sys.path.append(".")
 import argparse
 from model.utils import str2bool, str2list
 
+LOGGING_PATH = './logging'
+
 parser = argparse.ArgumentParser(description="Model Options")
 parser.add_argument(
     "--run-identifier",
@@ -12,7 +14,6 @@ parser.add_argument(
     required=True,
     help="Add an identifier that will be used to store the run in tensorboard.",
 )
-
 parser.add_argument(
     "--similarity-threshold",
     "-thr",
@@ -22,7 +23,6 @@ parser.add_argument(
     required=False,
     help="Similarity threshold used for chunking in the embedding space.",
 )
-
 parser.add_argument(
     "--hard-span",
     "-span",
@@ -32,7 +32,6 @@ parser.add_argument(
     required=False,
     help="Hard span used for chunking naively.",
 )
-
 parser.add_argument(
     "--max-skip",
     "-skip",
@@ -42,7 +41,6 @@ parser.add_argument(
     required=False,
     help="Max skip for Agglomerative Clustering.",
 )
-
 parser.add_argument(
     "--chunker",
     dest="chunker",
@@ -51,7 +49,6 @@ parser.add_argument(
     choices=["NNSimilarity", "agglomerative", "hard"],
     help="Specify the bracketing part of the net",
 )
-
 parser.add_argument(
     "--pooling",
     dest="pooling",
@@ -80,14 +77,6 @@ parser.add_argument(
     help="rood directory where tensorboard logs are stored. ./tensorboard by default",
 )
 parser.add_argument(
-    "--tensorboard-comment",
-    "-tbcomment",
-    dest="tensorboard_comment",
-    type=str,
-    required=False,
-    default=None,
-)
-parser.add_argument(
     "--eval-periodicity",
     "-evalperiod",
     type=int,
@@ -97,11 +86,29 @@ parser.add_argument(
     help="How often in iterations the model is evaluated",
 )
 parser.add_argument(
-    "--load-checkpoint",
-    "-load",
-    dest="load_checkpoint",
+    "--checkpoint-id",
+    "-checkid",
+    dest='checkpoint_id',
+    type=str,
     required=False,
-    action="store_true",
+    help="ID of the checkpoint to load."
+)
+parser.add_argument(
+    "--load-modules",
+    "-load",
+    dest="modules_to_load",
+    default='[]',
+    required=False,
+    type=str2list,
+    help="What modules need to be loaded from checkpoint?"
+)
+parser.add_argument(
+    "--save-modules",
+    "-save",
+    dest="modules_to_save",
+    default="[multitasknet]",
+    type=str2list,
+    help="What modules need to be saved in checkpoint?"
 )
 parser.add_argument(
     "--wall-time",
@@ -128,7 +135,6 @@ parser.add_argument(
     dest="eval_comp",
     help="set if compression happens during evaluation, True or False",
 )
-
 parser.add_argument(
     "--full-test-eval",
     "-fev",
@@ -138,15 +144,23 @@ parser.add_argument(
     dest="full_test_eval",
     help="Set if an evaluation on the full test set is made at the end.",
 )
-
 parser.add_argument(
     "--datasets",
     "-dts",
     required=False,
-    default='[SST2, QQP]',
+    default='[SST2, QQP, MNLI]',
     type=str2list,
     dest="datasets",
     help="Set the datasets to train on.",
+)
+parser.add_argument(
+    "--log-level",
+    "-log",
+    default='info',
+    type=str,
+    choices=['debug', 'info', 'warning'],
+    required=False,
+    help="Level used for debugging."
 )
 
 args = parser.parse_args()

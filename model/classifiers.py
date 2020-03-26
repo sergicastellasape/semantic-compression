@@ -1,3 +1,4 @@
+import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -419,7 +420,7 @@ class NaivePoolingClassifier(nn.Module):
         return self.loss_fn(prediction, target)
 
     def forward(self, input, **kwargs):
-        # print('input classifier size', input.size())
+        logging.debug('Input Classifier size', input.size())
         # input is size (batch, max_seq_length, embedding_dim)
         inp = self.pre_pooling_linear(input)
         pooled_features = abs_max_pooling(inp, dim=1)
@@ -497,7 +498,7 @@ class SeqPairFancyClassifier(nn.Module):
         batch_size = input.size(0)
         # seq_pair_mask looks like [00000000001111111111] so for the second
         # sentence one needs to multiply by the mask and for the first one it's
-        # the negation print('seq pair original mask:', seq_pair_mask[0, :])
+        # the negation
         mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
         mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size()).to(self.device)
 
