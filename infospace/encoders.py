@@ -23,10 +23,7 @@ class InfoCoder(nn.Module):
         # inp.size() = batch, len, embedding_dim
         return self.fc1(inp)
 
-    def loss(self, info_embeddings, target_similarity):
+    def loss(self, info_embeddings, target_metric):
         # info_embeddings.size() = batch, len, embedding_dim
         # pairwise_sim = batch, len, len
-        pairwise_sim = self.cosine_sim(
-            info_embeddings.unsqueeze(-2),
-            info_embeddings.unsqueeze(-3)
-        )
+        # FIXME: parallel computation of the pairwise loss
