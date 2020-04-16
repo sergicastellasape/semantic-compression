@@ -42,11 +42,20 @@ parser.add_argument(
     help="Max skip for Agglomerative Clustering.",
 )
 parser.add_argument(
+    "--out-num",
+    "-out",
+    dest="out_num",
+    type=int,
+    default=0,
+    required=False,
+    help="Number of fixed output size for the fixed out size chunker.",
+)
+parser.add_argument(
     "--chunker",
     dest="chunker",
     type=str,
     required=True,
-    choices=["NNSimilarity", "agglomerative", "hard"],
+    choices=["NNSimilarity", "agglomerative", "hard", "fixed"],
     help="Specify the bracketing part of the net",
 )
 parser.add_argument(
