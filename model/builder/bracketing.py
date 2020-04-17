@@ -3,6 +3,7 @@ from ..bracketing import (
     NNSimilarityChunker,
     AgglomerativeClusteringChunker,
     HardSpanChunker,
+    FixedOutChunker,
     cos
 )
 
@@ -11,6 +12,7 @@ def make_bracketer(name=None,
                    dist_threshold=None,
                    max_skip=None,
                    span=None,
+                   out_num=None,
                    device=None):
 
     assert device is not None
@@ -36,6 +38,11 @@ def make_bracketer(name=None,
         logging.info("BRACKETER: Hard Span")
         assert span != 0, "Provide a valid span!"
         bracketing_net = HardSpanChunker(span=span,
+                                         device=device)
+    elif name == 'fixed':
+        logging.info("BRACKETER: Fixed Output Size")
+        assert out_num is not None
+        bracketing_net = FixedOutChunker(out_num=out_num,
                                          device=device)
     else:
         raise ValueError("You must pass a valid chunker as an argument!")

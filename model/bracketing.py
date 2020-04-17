@@ -3,6 +3,7 @@ from typing import List
 from collections import Counter
 import re
 from sklearn import cluster
+import numpy as np
 import torch
 import torch.nn as nn
 from model.utils import make_connectivity_matrix
@@ -242,6 +243,54 @@ class HardSpanChunker(nn.Module):
             # ordered_idxs = [(0,), (1, 2, 3), (4,), (5, 6, 7), (8, 9, 10), (11,)]
             indices_to_compact.append(ordered_idxs)
         return indices_to_compact
+
+
+class FixedOutChunker(nn.Module):
+    def __init__(self, out_num=None, device=torch.device('cpu')):
+        super().__init__()
+        assert out_num is not None
+        self.device = device
+        self.id = nn.Identity()
+        self.out_num = out_num
+
+    def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
+        assert masks_dict is not None
+        batch_size = inp.size(0)
+        if not mask_special_tokens:
+            keep_mask = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
+        else:
+            keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach().cpu().numpy()
+        indices_to_compact = []
+        for b in range(batch_size):
+            # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
+            m = keep_mask[b, :]
+            start_stop = [0]
+            s = [start_stop.append(i) for i in range(1, len(m)) if m[i] != m[i - 1]]
+            # start_stop = [0, 1, 4, 5, 12] ; where the switches happen
+            if m[-1] == 1:  # [......1]
+                start_stop.append(len(m))  # add last element if it's beefy
+            else:           # [......0]
+                # add 1 step for final <sep> token, useful for qualitative analysis
+                start_stop.append(max(start_stop) + 1)
+
+            ordered_idxs = []
+            for i in range(len(start_stop) - 1):
+                start = start_stop[i]
+                stop = start_stop[i + 1]
+                # Same as for hard span chunker but specifying the number of vectors
+                L_ = np.linspace(start, stop, num=self.out_num + 1, endpoint=True, dtype=int)
+                L_ = list(np.unique(L_))
+                if max(L_) < stop:
+                    L_.append(stop)
+                # L_ = [0, 1]; [1, 4]; [4, 5]; etc. the 'ranges' to merge
+                L = [tuple(range(L_[i], L_[i + 1])) for i in range(len(L_) - 1)]
+                ordered_idxs.extend(L)
+
+            # ordered_idxs = [(0,), (1, 2, 3), (4,), (5, 6, 7), (8, 9, 10), (11,)]
+            indices_to_compact.append(ordered_idxs)
+        print(indices_to_compact)
+        return indices_to_compact
+
 
 
 class IdentityChunker(nn.Module):
