@@ -80,7 +80,7 @@ transformer_net = Transformer(
     model_class=BertModel,
     tokenizer_class=BertTokenizer,
     pre_trained_weights="bert-base-uncased",
-    output_layer=-2,
+    output_layer=args.trf_out_layer,
     device=device,
 )
 

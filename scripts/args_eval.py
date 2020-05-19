@@ -13,7 +13,6 @@ parser.add_argument(
     required=True,
     help="Add an identifier that will be used to store the run in tensorboard.",
 )
-
 parser.add_argument(
     "--similarity-threshold",
     "-thr",
@@ -22,7 +21,6 @@ parser.add_argument(
     required=True,
     help="Similarity threshold used for chunking in the embedding space.",
 )
-
 parser.add_argument(
     "--chunker",
     dest="chunker",
@@ -31,7 +29,6 @@ parser.add_argument(
     choices=["NNSimilarity", "agglomerative"],
     help="Specify the bracketing part of the net",
 )
-
 parser.add_argument(
     "--eval-compression",
     "-ec",
@@ -39,6 +36,15 @@ parser.add_argument(
     type=str2bool,
     dest="eval_comp",
     help="set if compression happens during evaluation, True or False",
+)
+parser.add_argument(
+    "--trf-out-layer",
+    "-layer",
+    dest="trf_out_layer",
+    type=int,
+    default=-2,
+    required=False,
+    help="Layer used from the transformer as embeddings.",
 )
 
 args = parser.parse_args()

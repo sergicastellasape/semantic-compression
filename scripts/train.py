@@ -86,7 +86,7 @@ span = args.span if args.span != 0 else None
 max_skip = args.max_skip if args.max_skip != 0 else None
 out_num = args.out_num if args.out_num != 0 else None
 
-transformer_net = make_transformer(output_layer=-2,
+transformer_net = make_transformer(output_layer=args.trf_out_layer,
                                    device=device)
 
 bracketing_net = make_bracketer(name=args.chunker,

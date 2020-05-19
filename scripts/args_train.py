@@ -77,6 +77,15 @@ parser.add_argument(
     help="Learning rate for Adam optimizer",
 )
 parser.add_argument(
+    "--trf-out-layer",
+    "-layer",
+    dest="trf_out_layer",
+    type=int,
+    default=-2,
+    required=False,
+    help="Layer used from the transformer as embeddings.",
+)
+parser.add_argument(
     "--tensorboard-dir",
     "-tbdir",
     dest="log_dir",
