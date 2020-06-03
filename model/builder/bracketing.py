@@ -4,6 +4,7 @@ from ..bracketing import (
     AgglomerativeClusteringChunker,
     HardSpanChunker,
     FixedOutChunker,
+    IdentityChunker,
     cos
 )
 
@@ -44,6 +45,10 @@ def make_bracketer(name=None,
         assert out_num is not None
         bracketing_net = FixedOutChunker(out_num=out_num,
                                          device=device)
+    elif name == 'none':
+        logging.info("BRACKETER: NO bracketer being used")
+        bracketing_net = IdentityChunker()
+
     else:
         raise ValueError("You must pass a valid chunker as an argument!")
 
