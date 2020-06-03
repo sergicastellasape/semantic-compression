@@ -60,6 +60,9 @@ with open("./config/datasets.yml", "r") as file:
     config = yaml.load(file, Loader=yaml.Loader)
 with open("./config/model.yml", "r") as file:
     model_config = yaml.load(file, Loader=yaml.Loader)
+with open("./config/optimizer.yml", "r") as file:
+    optimizer_config = yaml.load(file, Loader=yaml.Loader)
+
 
 # modify the datasets according to the arg passed
 config["datasets"] = args.datasets
@@ -159,12 +162,13 @@ initial_time = time.time()
 params = list(multitask_net.parameters()) + list(generator_net.parameters())
 optimizer = torch.optim.Adam(
     params,
-    lr=args.lr,
+    lr=optimizer_config['learning_rate'],
     betas=(0.9, 0.999),
     eps=1e-08,
     weight_decay=0.0001,
     amsgrad=False,
 )
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 1000], gamma=0.1)
 
 finished_training = False
 t = time.time()
@@ -225,6 +229,7 @@ while not finished_training:
     optimizer.zero_grad()
     L.backward()
     optimizer.step()
+    scheduler.step()
     batch_loss += L.item()
 
     if (global_counter % eval_periodicity == 0):  # and (global_counter != 0):

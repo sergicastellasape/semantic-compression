@@ -54,8 +54,9 @@ parser.add_argument(
     "--chunker",
     dest="chunker",
     type=str,
-    required=True,
-    choices=["NNSimilarity", "agglomerative", "hard", "fixed"],
+    required=False,
+    default="none",
+    choices=["NNSimilarity", "agglomerative", "hard", "fixed", "none"],
     help="Specify the bracketing part of the net",
 )
 parser.add_argument(
