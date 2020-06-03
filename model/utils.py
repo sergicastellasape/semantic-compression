@@ -155,19 +155,11 @@ def txt2list(txt_path=None):
     return sentences
 
 
-def abs_max_pooling(T, dim=1):
-    # input is (batch, seq_length, emb_dimension)
-    # max over abs in sequence dimension
-    _, abs_max_i = torch.max(T.abs(), dim=dim)
-    # convert indices into one_hot vectors
-    one_hot = (
-        torch.nn.functional.one_hot(abs_max_i, num_classes=T.size()[dim])
-        .transpose(dim, -1)
-        .type(torch.float)
-    )
-    # multily original with 1-hot to apply mask and then sum over the dimension
-    max_abs_tensor = torch.mul(T, one_hot).sum(dim=dim)
-    return max_abs_tensor
+def abs_max_pooling(T, dim=-1):
+    # Reduce with absolute max pooling over the specified dimension
+    abs_max, _ = torch.max(T.abs(), dim=dim, keepdim=True)
+    bool_mask = T.abs() >= abs_max
+    return (T * bool_mask).sum(dim=dim)
 
 
 def mean_pooling(T, dim=1):
