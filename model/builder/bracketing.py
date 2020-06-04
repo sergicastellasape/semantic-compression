@@ -4,6 +4,7 @@ from ..bracketing import (
     AgglomerativeClusteringChunker,
     HardSpanChunker,
     FixedOutChunker,
+    FreqChunker,
     IdentityChunker,
     cos
 )
@@ -14,6 +15,7 @@ def make_bracketer(name=None,
                    max_skip=None,
                    span=None,
                    out_num=None,
+                   log_threshold=None,
                    device=None):
 
     assert device is not None
@@ -45,6 +47,12 @@ def make_bracketer(name=None,
         assert out_num is not None
         bracketing_net = FixedOutChunker(out_num=out_num,
                                          device=device)
+    elif name ==  'freq':
+        logging.info("BRACKETER: Frequency based bracketer")
+        assert log_threshold is not None
+        bracketing_net = FreqChunker(alpha=1.0,
+                                     log_threshold=log_threshold,
+                                     device=torch.device('cpu'))
     elif name == 'none':
         logging.info("BRACKETER: NO bracketer being used")
         bracketing_net = IdentityChunker()

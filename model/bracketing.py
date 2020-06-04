@@ -6,7 +6,7 @@ from sklearn import cluster
 import numpy as np
 import torch
 import torch.nn as nn
-from model.utils import make_connectivity_matrix
+from model.utils import make_connectivity_matrix, log_zipf_law
 
 cos = torch.nn.CosineSimilarity(dim=-1, eps=1e-5)  # default similarity func.
 
@@ -288,9 +288,64 @@ class FixedOutChunker(nn.Module):
 
             # ordered_idxs = [(0,), (1, 2, 3), (4,), (5, 6, 7), (8, 9, 10), (11,)]
             indices_to_compact.append(ordered_idxs)
-        print(indices_to_compact)
         return indices_to_compact
 
+
+class FreqChunker(nn.Module):
+    def __init__(self,
+                 alpha=1.0,
+                 log_threshold=None,
+                 device=torch.device('cpu'),
+                 **kwargs):
+        super().__init__()
+        assert log_threshold is not None, "log_threshold is a required argument"
+        assert log_threshold < 0, "Log threshold must be negative! i.e. -5, -20"
+        self.device = device
+        self.alpha = alpha
+        self.log_threshold = log_threshold
+
+    def forward(self,
+                inp,
+                masks_dict=None,
+                mask_special_tokens=True,
+                token_ids=None,
+                **kwargs):
+
+        assert masks_dict is not None, "masks_dict is a required argument"
+
+        batch_size = inp.size(0)
+
+        if not mask_special_tokens:
+            keep_mask = (masks_dict['padding_mask'] == 1).detach()
+        else:
+            keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach()
+
+        # 'the' is the first wordpiece token at position 1996
+        token_log_likelihoods = log_zipf_law(token_ids, rank_first=1996)
+
+        indices_to_compact = []
+        for b in range(batch_size):
+            # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
+            m = keep_mask[b, :]
+            sums = torch.tensor([token_log_likelihoods[b, :i].detach().sum(dim=-1) for i in range(0, len(m))])
+            idx_left, idx_right, finished, idxs_b = 0, 0, False, []
+            while idx_right < len(m):
+                try:
+                    idx_right = list((sums < self.log_threshold) * m + ~m).index(True)
+                    idx_right = idx_left + 1 if idx_right == idx_left else idx_right
+
+                # if no point to the right is a good boundary for a chunk it
+                # means all the sequence is a chunk
+                except ValueError:
+                    idx_right = len(m)
+
+                idxs_b.append(list(range(idx_left, idx_right)))
+                sums[:idx_right] = 0
+                idx_left = idx_right
+
+            indices_to_compact.append(idxs_b)
+
+        return indices_to_compact
 
 
 class IdentityChunker(nn.Module):

@@ -166,6 +166,13 @@ def mean_pooling(T, dim=1):
     return T.mean(dim=1)
 
 
+def log_zipf_law(inp, alpha=1., ct=1., rank_first=1996):
+    ranks = (inp - rank_first) * (inp > rank_first) + 1.
+    log_ct = torch.log(torch.tensor(ct, dtype=torch.float32))
+    log_rank = torch.log(torch.tensor(ranks, dtype=torch.float32))
+    return log_ct - alpha * log_rank
+
+
 def hotfix_pack_padded_sequence(inp,
                                 lengths,
                                 batch_first=False,
