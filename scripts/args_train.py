@@ -127,6 +127,7 @@ parser.add_argument(
     dest="modules_to_save",
     default="[multitasknet]",
     type=str2list,
+    required=False,
     help="What modules need to be saved in checkpoint?"
 )
 parser.add_argument(

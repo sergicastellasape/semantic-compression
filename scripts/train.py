@@ -124,7 +124,13 @@ eval_periodicity = args.evalperiod
 
 # Tensorboard init
 writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, run_identifier))
-
+# Load tensorboard's global counter
+counter_path = os.path.join(LOG_DIR, run_identifier, 'global_counter.pt')
+if os.path.exists(counter_path):
+    logging.info("Resuming global counter from Tensorboard events directory...")
+    global_counter = int(torch.load(counter_path))
+else:
+    global_counter = 0
 
 # Load checkpoint from modules in --load-modules argument
 model.load_modules(args.checkpoint_id,
@@ -152,8 +158,7 @@ test_dataframes_dict = {
 }
 batch_indices = {}
 
-global_counter, batch_loss, max_acc = 0, 0, 0
-
+batch_loss, max_acc = 0, 0
 
 ################################################################################
 ############################### ACUTAL TRAINING ################################
@@ -171,12 +176,12 @@ scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
                                                  milestones=optimizer_config['milestones'],
                                                  gamma=optimizer_config['gamma'])
 
-finished_training = False
+finished_training, first_iteration = False, True
 t = time.time()
 while not finished_training:
     # Reset counter for dataset if it's been finished
     for dataset in config["datasets"]:
-        if counter[dataset] >= n_batches[dataset] or global_counter == 0:
+        if counter[dataset] >= n_batches[dataset] or first_iteration:
             logging.info(f"NEW EPOCH STARTED FOR DATASET {dataset}!")
             counter[dataset] = 0
             batch_indices[dataset] = None
@@ -223,8 +228,8 @@ while not finished_training:
     metrics = model.metrics(batch_predictions, batch_targets)
 
     # Log to tensorboard
-    writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_counter)
-    writer.add_scalars(f"metrics/train/{run_identifier}", metrics, global_counter)
+    writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_step=global_counter)
+    writer.add_scalars(f"metrics/train/{run_identifier}", metrics, global_step=global_counter)
 
     # Update net
     optimizer.zero_grad()
@@ -233,7 +238,7 @@ while not finished_training:
     scheduler.step()
     batch_loss += L.item()
 
-    if (global_counter % eval_periodicity == 0):  # and (global_counter != 0):
+    if (global_counter % eval_periodicity == 0) and (global_counter != 0):
         logging.info(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
@@ -267,8 +272,12 @@ while not finished_training:
         batch_loss, t = 0, time.time()
         # Log to tensorboard
         writer.add_scalars(f"metrics/dev/{run_identifier}",
-                           metrics_dict, global_counter)
+                           metrics_dict, global_step=global_counter)
+
     global_counter += 1
+    first_iteration = False
+    # Update the saved global_counter in tensorboard directory
+    torch.save(global_counter, counter_path)
     finished_training = True if (
         time.time() - initial_time) > args.walltime else False
 
