@@ -262,6 +262,8 @@ while not finished_training:
         logging.info(f"Eval metrics: {metrics_dict}")
         logging.info(f"Global Loss: {batch_loss/eval_periodicity}")
         logging.info(f"Compression Rates: {compression_dict}")
+        if optimizer.__dict__['param_groups'][0]['lr']:
+            logging.info(f"Current Learning Rate: {optimizer.__dict__['param_groups'][0]['lr']}")
         batch_loss, t = 0, time.time()
         # Log to tensorboard
         writer.add_scalars(f"metrics/dev/{run_identifier}",
