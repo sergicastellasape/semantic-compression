@@ -63,7 +63,6 @@ with open("./config/model.yml", "r") as file:
 with open("./config/optimizer.yml", "r") as file:
     optimizer_config = yaml.load(file, Loader=yaml.Loader)
 
-
 # modify the datasets according to the arg passed
 config["datasets"] = args.datasets
 
@@ -168,7 +167,9 @@ optimizer = torch.optim.Adam(
     weight_decay=0.0001,
     amsgrad=False,
 )
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 1000], gamma=0.1)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                 milestones=optimizer_config['milestones'],
+                                                 gamma=optimizer_config['gamma'])
 
 finished_training = False
 t = time.time()
