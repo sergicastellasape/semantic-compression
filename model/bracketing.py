@@ -339,8 +339,8 @@ class FreqChunker(nn.Module):
                 except ValueError:
                     idx_right = len(m)
 
-                idxs_b.append(list(range(idx_left, idx_right)))
-                sums[:idx_right] = 0
+                idxs_b.append(tuple(range(idx_left, idx_right)))
+                sums[:idx_right], m[:idx_right] = 0, True
                 idx_left = idx_right
 
             indices_to_compact.append(idxs_b)

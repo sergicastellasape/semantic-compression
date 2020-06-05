@@ -53,7 +53,7 @@ class EmbeddingGenerator(nn.Module):
             for i, idx_tuple in enumerate(chunk_indices):
                 # Apply pooling function for the group of tensors
                 joint = self.pool_function(
-                    tensors_batch[b, idx_tuple, :].unsqueeze(0))
+                    tensors_batch[b, idx_tuple, :], dim=0)  # idx_tuple dimension
                 compact_tensors_batch[b, i, :] = joint.requires_grad_(True)
 
                 # Make sure we're not mixing up regular tokens, special tokens

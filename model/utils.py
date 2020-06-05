@@ -46,7 +46,6 @@ def eval_model_on_DF(
                 # construct targets
                 batch_targets[dataset] = torch.tensor([data[1] for data in dataset_batch],
                                                       dtype=torch.int64, device=device)
-
                 # construct sequences
                 batch_sequences.extend([data[0] for data in dataset_batch])
                 batch_predictions, compression_rate = model.forward(
@@ -60,8 +59,10 @@ def eval_model_on_DF(
                 dev_acc += m[dataset]
                 cummulative_comp += compression_rate
                 idx_left += step_size
-            acc = dev_acc / n_batches
-            comp = cummulative_comp / n_batches
+            # Average over all the batches (accounting for the fact that the last
+            # batch is possibly of a different size)
+            acc = dev_acc * batch_size / sum(batches)
+            comp = cummulative_comp * batch_size / sum(batches)
             metrics_dict[dataset] = acc
             compression_dict[dataset] = comp
 
@@ -168,14 +169,14 @@ def abs_max_pooling(T, dim=-1, keepdim=False):
     return (T * bool_mask).sum(dim=dim, keepdim=keepdim)
 
 
-def mean_pooling(T, dim=1, keepdim=False):
-    return T.mean(dim=1, keepdim=keepdim)
+def mean_pooling(T, dim=-1, keepdim=False):
+    return T.mean(dim=dim, keepdim=keepdim)
 
 
 def log_zipf_law(inp, alpha=1., ct=1., rank_first=1996):
     ranks = (inp - rank_first) * (inp > rank_first) + 1.
     log_ct = torch.log(torch.tensor(ct, dtype=torch.float32))
-    log_rank = torch.log(torch.tensor(ranks, dtype=torch.float32))
+    log_rank = torch.log(ranks.float())
     return log_ct - alpha * log_rank
 
 
