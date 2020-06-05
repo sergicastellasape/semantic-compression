@@ -1,9 +1,14 @@
-from ..generators import EmbeddingGenerator, ParamEmbeddingGenerator, ConvAtt
+from ..generators import (
+    EmbeddingGenerator,
+    ParamEmbeddingGenerator,
+    ConvAtt,
+    IdentityGenerator
+)
 from ..utils import abs_max_pooling, mean_pooling
 
-def make_generator(pooling=None, device=None):
-    assert pooling is not None
+def make_generator(args, device=None):
     assert device is not None
+
     embedding_dim = 768  # hardcoded for now
     pooling_fn = {
         'abs_max_pooling': abs_max_pooling,
@@ -12,12 +17,15 @@ def make_generator(pooling=None, device=None):
     pooling_nn = {
         'conv_att': ConvAtt
     }
-    if pooling in pooling_fn.keys():
-        return EmbeddingGenerator(pool_function=pooling_fn[pooling],
+    if args.pooling is None:
+        return IdentityGenerator(device=device)
+
+    if args.pooling in pooling_fn.keys():
+        return EmbeddingGenerator(pool_function=pooling_fn[args.pooling],
                                   device=device)
-    elif pooling in pooling_nn.keys():
+    elif args.pooling in pooling_nn.keys():
         return ParamEmbeddingGenerator(embedding_dim=embedding_dim,
-                                       gen_net=pooling_nn[pooling],
+                                       gen_net=pooling_nn[args.pooling],
                                        device=device)
     else:
         raise Exception("The provided pooling argument is not valid")

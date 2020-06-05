@@ -19,16 +19,25 @@ parser.add_argument(
     "-thr",
     dest="sim_threshold",
     type=float,
-    default=666,
+    default=None,
     required=False,
     help="Similarity threshold used for chunking in the embedding space.",
+)
+parser.add_argument(
+    "--log-threshold",
+    "-logthr",
+    dest="log_threshold",
+    type=float,
+    default=None,
+    required=False,
+    help="Log likelihood threshold for the frequency based bracketing.",
 )
 parser.add_argument(
     "--hard-span",
     "-span",
     dest="span",
     type=int,
-    default=0,
+    default=None,
     required=False,
     help="Hard span used for chunking naively.",
 )
@@ -37,7 +46,7 @@ parser.add_argument(
     "-skip",
     dest="max_skip",
     type=int,
-    default=0,
+    default=None,
     required=False,
     help="Max skip for Agglomerative Clustering.",
 )
@@ -46,7 +55,7 @@ parser.add_argument(
     "-out",
     dest="out_num",
     type=int,
-    default=0,
+    default=None,
     required=False,
     help="Number of fixed output size for the fixed out size chunker.",
 )
@@ -55,27 +64,18 @@ parser.add_argument(
     dest="chunker",
     type=str,
     required=False,
-    default="none",
-    choices=["NNSimilarity", "agglomerative", "hard", "fixed", "none"],
-    help="Specify the bracketing part of the net",
+    default=None,
+    choices=["NNSimilarity", "agglomerative", "hard", "fixed", "freq"],
+    help="Specify the chunker part of the net",
 )
 parser.add_argument(
     "--pooling",
     dest="pooling",
     type=str,
-    default="mean_pooling",
+    default=None,
     required=False,
     choices=["abs_max_pooling", "mean_pooling", "conv_att"],
     help="function to do the generation"
-)
-parser.add_argument(
-    "--learning-rate",
-    "-lr",
-    dest="lr",
-    type=float,
-    required=False,
-    default=0.0001,
-    help="Learning rate for Adam optimizer",
 )
 parser.add_argument(
     "--trf-out-layer",

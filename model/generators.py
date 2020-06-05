@@ -145,8 +145,8 @@ class ParamEmbeddingGenerator(nn.Module):
 
                 # update compact masks. Given the guarantees from the bracketing to
                 # not mix padding, regular and special tokens, the 'loose' criteria
-                # can be assumed to be 'hard'
-                # if any of the tokens is not padding (0s), add it as non-padding (1s)
+                # can be assumed to be 'hard' if any of the tokens is not padding
+                # (0s), add it as non-padding (1s)
                 if masks_dict["padding_mask"][b, idx_tuple].sum() != 0:
                     mask_padding[b, i] = 1
                 # if some tokens are "regular" add the index to the mask
@@ -215,8 +215,9 @@ class ConvAtt(nn.Module):
 
 
 class IdentityGenerator(nn.Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, device=torch.device('cpu'), *args, **kwargs):
         super(IdentityGenerator, self).__init__()
+        self.device = device
 
     def forward(self, x, *args, masks_dict=None, **kwargs):
         assert masks_dict is not None

@@ -56,15 +56,19 @@ logging.basicConfig(filename=os.path.join(LOGGING_PATH, f'{args.run_id}.txt'),
 logging.getLogger("transformers").setLevel(logging.WARNING)
 
 # load config file from datasets
-with open("./config/datasets.yml", "r") as file:
-    config = yaml.load(file, Loader=yaml.Loader)
-with open("./config/model.yml", "r") as file:
-    model_config = yaml.load(file, Loader=yaml.Loader)
-with open("./config/optimizer.yml", "r") as file:
-    optimizer_config = yaml.load(file, Loader=yaml.Loader)
+with open("./config/datasets.yml", "r") as f:
+    config = yaml.load(f, Loader=yaml.Loader)
+with open("./config/model.yml", "r") as f:
+    model_config = yaml.load(f, Loader=yaml.Loader)
+with open("./config/optimizer.yml", "r") as f:
+    optimizer_config = yaml.load(f, Loader=yaml.Loader)
 
 # modify the datasets according to the arg passed
 config["datasets"] = args.datasets
+
+if args.train_comp or args.eval_comp:
+    assert args.pooling is not None
+    assert args.chunker is not None
 
 ################################################################################
 ################################ LOAD DATASETS #################################
@@ -82,30 +86,10 @@ device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
 logging.info(f"DEVICE: {device}")
 
-# Assign threshold if it was given in args
-sim_threshold = args.sim_threshold if args.sim_threshold != 666 else None
-span = args.span if args.span != 0 else None
-max_skip = args.max_skip if args.max_skip != 0 else None
-out_num = args.out_num if args.out_num != 0 else None
-
-transformer_net = make_transformer(output_layer=args.trf_out_layer,
-                                   device=device)
-
-bracketing_net = make_bracketer(name=args.chunker,
-                                device=device,
-                                sim_threshold=sim_threshold,
-                                dist_threshold=sim_threshold,
-                                max_skip=max_skip,
-                                out_num=out_num,
-                                span=span)
-
-generator_net = make_generator(pooling=args.pooling,
-                               device=device)
-
-multitask_net = make_multitask_net(datasets=args.datasets,
-                                   config=config,
-                                   device=device)
-
+transformer_net = make_transformer(args, device=device)
+bracketing_net = make_bracketer(args, device=device)
+generator_net = make_generator(args, device=device)
+multitask_net = make_multitask_net(args, config, device=device)
 model = End2EndModel(transformer=transformer_net,
                      bracketer=bracketing_net,
                      generator=generator_net,
@@ -118,14 +102,11 @@ logging.info(f"Compression in Evaluation: {args.eval_comp}")
 ################################################################################
 ############################## DEFINE CONSTANTS ################################
 torch.manual_seed(0)
-LOG_DIR = args.log_dir
-run_identifier = args.run_id
-eval_periodicity = args.evalperiod
 
 # Tensorboard init
-writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, run_identifier))
+writer = SummaryWriter(log_dir=os.path.join(args.log_dir, args.run_id))
 # Load tensorboard's global counter
-counter_path = os.path.join(LOG_DIR, run_identifier, 'global_counter.pt')
+counter_path = os.path.join(args.log_dir, args.run_id, 'global_counter.pt')
 if os.path.exists(counter_path):
     logging.info("Resuming global counter from Tensorboard events directory...")
     global_counter = int(torch.load(counter_path))
@@ -228,8 +209,8 @@ while not finished_training:
     metrics = model.metrics(batch_predictions, batch_targets)
 
     # Log to tensorboard
-    writer.add_scalar(f"loss/train/{run_identifier}", L.item(), global_step=global_counter)
-    writer.add_scalars(f"metrics/train/{run_identifier}", metrics, global_step=global_counter)
+    writer.add_scalar(f"loss/train/{args.run_id}", L.item(), global_step=global_counter)
+    writer.add_scalars(f"metrics/train/{args.run_id}", metrics, global_step=global_counter)
 
     # Update net
     optimizer.zero_grad()
@@ -238,11 +219,11 @@ while not finished_training:
     scheduler.step()
     batch_loss += L.item()
 
-    if (global_counter % eval_periodicity == 0) and (global_counter != 0):
+    if (global_counter % args.evalperiod == 0) and (global_counter != 0):
         logging.info(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
-        logging.info(f"Iterations per second: {eval_periodicity/(time.time()-t)}")
+        logging.info(f"Iterations per second: {args.evalperiod / (time.time()-t)}")
         # Evaluate on dev sets
         model.eval()
         metrics_dict, compression_dict = eval_model_on_DF(
@@ -265,13 +246,13 @@ while not finished_training:
             logging.info("NEW CHECKPOINT SAVED!")
 
         logging.info(f"Eval metrics: {metrics_dict}")
-        logging.info(f"Global Loss: {batch_loss/eval_periodicity}")
+        logging.info(f"Global Loss: {batch_loss / args.evalperiod}")
         logging.info(f"Compression Rates: {compression_dict}")
         if optimizer.__dict__['param_groups'][0]['lr']:
             logging.info(f"Current Learning Rate: {optimizer.__dict__['param_groups'][0]['lr']}")
         batch_loss, t = 0, time.time()
         # Log to tensorboard
-        writer.add_scalars(f"metrics/dev/{run_identifier}",
+        writer.add_scalars(f"metrics/dev/{args.run_id}",
                            metrics_dict, global_step=global_counter)
 
     global_counter += 1
@@ -299,4 +280,4 @@ if args.full_test_eval:
         device=device,
     )
     logging.info(f"Full test set losses: {metrics_dict}")
-    writer.add_scalars(f"metrics/test/{run_identifier}", metrics_dict, 0)
+    writer.add_scalars(f"metrics/test/{args.run_id}", metrics_dict, 0)

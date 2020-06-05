@@ -29,14 +29,19 @@ def eval_model_on_DF(
     metrics_dict, compression_dict = {}, {}
     with torch.no_grad():
         for dataset, df in dataframes_dict.items():
+            # Divide the dataset in batches of batch_size, adding the last
+            # batch if necessary
             n_batches = math.floor(len(df) / batch_size)
+            batches = [batch_size] * n_batches + [len(df) % batch_size]
+            if 0 in batches: batches.remove(0)  # remove last 0 if it exists
             # make sure all slices are empty for datasets that are not the current one
             batch_slices = defaultdict(lambda: slice(0, 0))
-            batch_slices[dataset] = slice(0, batch_size)
-            dev_acc, cummulative_comp = 0, 0
-            for i in tqdm(range(n_batches), desc=f'Progress on {dataset}'):
+            dev_acc, cummulative_comp, idx_left = 0, 0, 0
+            for step_size in tqdm(batches, desc=f'Progress on {dataset}'):
                 batch_targets, batch_sequences = {}, []
-                indices = list(range(i * batch_size, (i + 1) * batch_size))
+                #indices = list(range(i * batch_size, (i + 1) * batch_size))
+                indices = list(range(idx_left, idx_left + step_size))
+                batch_slices[dataset] = slice(0, len(indices))
                 dataset_batch = get_batch_function_dict[dataset](df, indices)
                 # construct targets
                 batch_targets[dataset] = torch.tensor([data[1] for data in dataset_batch],
@@ -54,6 +59,7 @@ def eval_model_on_DF(
                 m = model.metrics(batch_predictions, batch_targets)
                 dev_acc += m[dataset]
                 cummulative_comp += compression_rate
+                idx_left += step_size
             acc = dev_acc / n_batches
             comp = cummulative_comp / n_batches
             metrics_dict[dataset] = acc
@@ -155,15 +161,15 @@ def txt2list(txt_path=None):
     return sentences
 
 
-def abs_max_pooling(T, dim=-1):
+def abs_max_pooling(T, dim=-1, keepdim=False):
     # Reduce with absolute max pooling over the specified dimension
     abs_max, _ = torch.max(T.abs(), dim=dim, keepdim=True)
     bool_mask = T.abs() >= abs_max
-    return (T * bool_mask).sum(dim=dim)
+    return (T * bool_mask).sum(dim=dim, keepdim=keepdim)
 
 
-def mean_pooling(T, dim=1):
-    return T.mean(dim=1)
+def mean_pooling(T, dim=1, keepdim=False):
+    return T.mean(dim=1, keepdim=keepdim)
 
 
 def log_zipf_law(inp, alpha=1., ct=1., rank_first=1996):
