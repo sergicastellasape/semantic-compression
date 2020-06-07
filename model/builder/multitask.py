@@ -5,10 +5,10 @@ import torch
 from .classifiers import classifiers_dict
 from ..model import MultiTaskNet
 
-def make_multitask_net(datasets, config, device=None):
+def make_multitask_net(args, config, device=None):
     assert device is not None
     network_list = []
-    for dataset in datasets:
+    for dataset in args.datasets:
         classifier_name = config[dataset]['classifier']
         num_classes = config[dataset]['num_classes']
         make_classifier = classifiers_dict[classifier_name]

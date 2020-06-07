@@ -53,7 +53,7 @@ class EmbeddingGenerator(nn.Module):
             for i, idx_tuple in enumerate(chunk_indices):
                 # Apply pooling function for the group of tensors
                 joint = self.pool_function(
-                    tensors_batch[b, idx_tuple, :].unsqueeze(0))
+                    tensors_batch[b, idx_tuple, :], dim=0)  # idx_tuple dimension
                 compact_tensors_batch[b, i, :] = joint.requires_grad_(True)
 
                 # Make sure we're not mixing up regular tokens, special tokens
@@ -145,8 +145,8 @@ class ParamEmbeddingGenerator(nn.Module):
 
                 # update compact masks. Given the guarantees from the bracketing to
                 # not mix padding, regular and special tokens, the 'loose' criteria
-                # can be assumed to be 'hard'
-                # if any of the tokens is not padding (0s), add it as non-padding (1s)
+                # can be assumed to be 'hard' if any of the tokens is not padding
+                # (0s), add it as non-padding (1s)
                 if masks_dict["padding_mask"][b, idx_tuple].sum() != 0:
                     mask_padding[b, i] = 1
                 # if some tokens are "regular" add the index to the mask
@@ -215,8 +215,9 @@ class ConvAtt(nn.Module):
 
 
 class IdentityGenerator(nn.Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, device=torch.device('cpu'), *args, **kwargs):
         super(IdentityGenerator, self).__init__()
+        self.device = device
 
     def forward(self, x, *args, masks_dict=None, **kwargs):
         assert masks_dict is not None

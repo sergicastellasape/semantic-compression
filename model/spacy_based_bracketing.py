@@ -87,11 +87,11 @@ class ClassicPipeline:
             - batch_noun_chunks: * list of sequences in the batch
                                    * list of noun chunks in the sequence
                                      * tuple of the tokens (strings) forming each noun chunk
-                               
+
             - batch_base_tokenization: * list of sequences in the batch
                                          * list of tokens (strings) in the sequence
         OUTPUT
-            - base_tokenization_brackets: list of tuples of strings 
+            - base_tokenization_brackets: list of tuples of strings
                                           (tuples of 1 element if they belong to no chunk)
         """
 
@@ -146,7 +146,7 @@ class ClassicPipeline:
 
     def chunk2spacy_indices(self, batch_sequence_bracketed):
         """
-        Given the "bracketed sequence" computes the index correspondence between the original 
+        Given the "bracketed sequence" computes the index correspondence between the original
         tokenization and the new compacted one.
         INPUT
             - batch_sequence_bracketed: list of lists of str/tuples (output of compact bracketing)

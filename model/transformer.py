@@ -23,14 +23,15 @@ class Transformer(nn.Module):
         self.tokenizer = tokenizer_class.from_pretrained(pre_trained_weights)
         self.output_layer = output_layer
 
-    def forward(self, batch_sequences, return_masks=False):
+    def forward(self, batch_sequences, return_extras=False):
+        # return_extras: add returning the masks_dict and the token_ids
         batch_input_ids, masks_dict = self.batch_encode(batch_sequences)
         hidden_states_tup = self.model(
             batch_input_ids, attention_mask=masks_dict["padding_mask"]
         )[-1]
 
-        if return_masks:
-            return hidden_states_tup[self.output_layer], masks_dict
+        if return_extras:
+            return hidden_states_tup[self.output_layer], masks_dict, batch_input_ids
         else:
             return hidden_states_tup[self.output_layer]
 

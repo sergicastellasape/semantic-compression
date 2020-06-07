@@ -42,14 +42,15 @@ class End2EndModel(nn.Module):
 
         assert compression in [True, False]
         assert batch_slices is not None
-        context_representation, masks_dict = self.transformer.forward(
-            sequences_batch, return_masks=True
+        context_representation, masks_dict, batch_input_ids = self.transformer.forward(
+            sequences_batch, return_extras=True
         )
 
         if compression:
             indices = self.bracketer.forward(context_representation,
                                              masks_dict=masks_dict,
-                                             mask_special_tokens=True)
+                                             mask_special_tokens=True,
+                                             token_ids=batch_input_ids)
             (
                 compact_representation,
                 compact_masks_dict,
