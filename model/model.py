@@ -101,7 +101,7 @@ class End2EndModel(nn.Module):
 
     def load_modules(self,
                      checkpoint_id,
-                     modules=['generator', 'multitask'],
+                     modules=[],
                      parent_path='./assets/checkpoints'):
 
         assert all(module in self.allowed_modules for module in modules),\

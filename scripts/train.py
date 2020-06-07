@@ -64,7 +64,10 @@ with open("./config/optimizer.yml", "r") as f:
     optimizer_config = yaml.load(f, Loader=yaml.Loader)
 
 # modify the datasets according to the arg passed
-config["datasets"] = args.datasets
+if args.datasets is not None:
+    config["datasets"] = args.datasets
+else:
+    args.datasets = config["datasets"]
 
 if args.train_comp or args.eval_comp:
     assert args.pooling is not None
@@ -101,7 +104,7 @@ logging.info(f"Compression in Evaluation: {args.eval_comp}")
 
 ################################################################################
 ############################## DEFINE CONSTANTS ################################
-torch.manual_seed(0)
+#torch.manual_seed(0)
 
 # Tensorboard init
 writer = SummaryWriter(log_dir=os.path.join(args.log_dir, args.run_id))
@@ -144,7 +147,12 @@ batch_loss, max_acc = 0, 0
 ################################################################################
 ############################### ACUTAL TRAINING ################################
 initial_time = time.time()
-params = list(multitask_net.parameters()) + list(generator_net.parameters())
+
+logging.info(f"Training modules: {args.modules_to_train}")
+params = []
+for module_name in args.modules_to_train:
+    params += list(getattr(model, module_name).parameters())
+
 optimizer = torch.optim.Adam(
     params,
     lr=optimizer_config['learning_rate'],

@@ -82,8 +82,7 @@ parser.add_argument(
     "-layer",
     dest="trf_out_layer",
     type=int,
-    default=-2,
-    required=False,
+    required=True,
     help="Layer used from the transformer as embeddings.",
 )
 parser.add_argument(
@@ -108,6 +107,7 @@ parser.add_argument(
     "--checkpoint-id",
     "-checkid",
     dest='checkpoint_id',
+    default=None,
     type=str,
     required=False,
     help="ID of the checkpoint to load."
@@ -131,6 +131,15 @@ parser.add_argument(
     help="What modules need to be saved in checkpoint?"
 )
 parser.add_argument(
+    "--train-modules",
+    "-train",
+    dest="modules_to_train",
+    default="[multitasknet]",
+    type=str2list,
+    required=False,
+    help="What modules need to be trained by the optimizer?"
+)
+parser.add_argument(
     "--wall-time",
     "-wt",
     dest="walltime",
@@ -142,7 +151,8 @@ parser.add_argument(
 parser.add_argument(
     "--train-compression",
     "-tc",
-    required=True,
+    required=False,
+    default='False',
     type=str2bool,
     dest="train_comp",
     help="set if compression happens during training, True or False",
@@ -150,7 +160,8 @@ parser.add_argument(
 parser.add_argument(
     "--eval-compression",
     "-ec",
-    required=True,
+    required=False,
+    default='False',
     type=str2bool,
     dest="eval_comp",
     help="set if compression happens during evaluation, True or False",
@@ -168,7 +179,7 @@ parser.add_argument(
     "--datasets",
     "-dts",
     required=False,
-    default='[SST2, QQP, MNLI]',
+    default=None,
     type=str2list,
     dest="datasets",
     help="Set the datasets to train on.",
