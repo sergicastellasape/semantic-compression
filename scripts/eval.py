@@ -105,11 +105,6 @@ logging.info(f"Compression in Evaluation: {args.eval_comp}")
 ############################## DEFINE CONSTANTS ################################
 #torch.manual_seed(0)
 
-# Load checkpoint from modules in --load-modules argument
-model.load_modules(args.checkpoint_id,
-                   modules=args.modules_to_load,
-                   parent_path='./assets/checkpoints')
-
 # LOAD CONFIG DICTS AND CREATE NEW ONES FROM THOSE
 get_batch_function = {
     dataset: config[dataset]["get_batch_fn"] for dataset in config["datasets"]
@@ -118,10 +113,11 @@ test_dataframes_dict = {
     dataset: dataframes[dataset]["test"] for dataset in config["datasets"]
 }
 
-# load 'best' checkpoint (according to dev set)
+# Load checkpoint from modules in --load-modules argument
 model.load_modules(args.checkpoint_id,
                    modules=args.modules_to_load,
-                   parent_path='./assets/checkpoints/')
+                   parent_path='./assets/checkpoints')
+
 model.eval()
 metrics_dict, compression_dict = eval_model_on_DF(
     model,
