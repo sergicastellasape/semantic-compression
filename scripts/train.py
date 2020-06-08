@@ -238,7 +238,7 @@ while not finished_training:
             model,
             dev_dataframes_dict,
             get_batch_function,
-            batch_size=32,
+            batch_size=16,
             global_counter=global_counter,
             compression=args.eval_comp,
             return_comp_rate=True,
