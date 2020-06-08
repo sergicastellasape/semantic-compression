@@ -3,6 +3,8 @@ Collection of useful little functions.
 """
 import argparse
 from collections import defaultdict
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 import re
 import time
 from tqdm import tqdm
@@ -70,6 +72,14 @@ def eval_model_on_DF(
         return metrics_dict, compression_dict
     else:
         return metrics_dict
+
+def write_google_sheet(results_dict, row=2, name='results_layers', sheet_name='run1'):
+    # Google API stuff
+    scope = ["https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name('config/gcp-credentials.json', scope)
+    client = gspread.authorize(creds)
+    sheet = client.open(name).worksheet(sheet_name)
+    sheet.update(f'B{row}:D{row}', [list(results_dict.values())])
 
 
 def make_connectivity_matrix(length, span=1):
