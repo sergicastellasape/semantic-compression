@@ -123,7 +123,7 @@ metrics_dict, compression_dict = eval_model_on_DF(
     model,
     test_dataframes_dict,
     get_batch_function,
-    batch_size=32,
+    batch_size=16,
     compression=args.eval_comp,
     return_comp_rate=True,
     device=device,
