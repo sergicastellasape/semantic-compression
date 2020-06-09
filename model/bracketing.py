@@ -327,24 +327,18 @@ class FreqChunker(nn.Module):
         for b in range(batch_size):
             # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
             m = keep_mask[b, :]
-            sums = torch.tensor(
-                [token_log_likelihoods[b, :i].detach().sum(dim=-1)
-                    for i in range(0, len(m))],
-                device=self.device
-            )
+            sums = torch.tensor([token_log_likelihoods[b, :i].detach().sum(dim=-1) for i in range(0, len(m))])
             idx_left, idx_right, finished, idxs_b = 0, 0, False, []
             while idx_right < len(m):
                 try:
-                    idx_right = list((sums < self.log_threshold) * m + ~m).index(True)
-                    idx_right = idx_left + 1 if idx_right == idx_left else idx_right
-
-                # if no point to the right is a good boundary for a chunk it
-                # means all the sequence is a chunk
+                    if m[idx_left] == 0:
+                        idx_right = idx_left + 1
+                    elif m[idx_left] == 1:
+                        bo = (sums - sums[idx_left]) < self.log_threshold
+                        idx_right = list(bo + ~m)[idx_left:].index(True) + idx_left
                 except ValueError:
                     idx_right = len(m)
-
-                idxs_b.append(tuple(range(idx_left, idx_right)))
-                sums[:idx_right], m[:idx_right] = 0, True
+                idxs_b.append(list(range(idx_left, idx_right)))
                 idx_left = idx_right
 
             indices_to_compact.append(idxs_b)
