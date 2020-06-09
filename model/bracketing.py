@@ -321,13 +321,14 @@ class FreqChunker(nn.Module):
             keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach()
 
         # 'the' is the first wordpiece token at position 1996
-        token_log_likelihoods = log_zipf_law(token_ids.cpu(), rank_first=1996)
+        token_log_likelihoods = log_zipf_law(token_ids, rank_first=1996)
 
         indices_to_compact = []
         for b in range(batch_size):
             # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
             m = keep_mask[b, :]
-            sums = torch.tensor([token_log_likelihoods[b, :i].detach().sum(dim=-1) for i in range(0, len(m))])
+            sums = torch.tensor([token_log_likelihoods[b, :i].detach().sum(dim=-1)
+                    for i in range(0, len(m))], device=token_log_likelihoods.device)
             idx_left, idx_right, finished, idxs_b = 0, 0, False, []
             while idx_right < len(m):
                 try:
@@ -335,7 +336,11 @@ class FreqChunker(nn.Module):
                         idx_right = idx_left + 1
                     elif m[idx_left] == 1:
                         bo = (sums - sums[idx_left]) < self.log_threshold
+                        print("bo", bo.device)
+                        print("mask", m.device)
+                        assert False
                         idx_right = list(bo + ~m)[idx_left:].index(True) + idx_left
+
                 except ValueError:
                     idx_right = len(m)
                 idxs_b.append(list(range(idx_left, idx_right)))
