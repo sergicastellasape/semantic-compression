@@ -336,9 +336,6 @@ class FreqChunker(nn.Module):
                         idx_right = idx_left + 1
                     elif m[idx_left] == 1:
                         bo = (sums - sums[idx_left]) < self.log_threshold
-                        print("bo", bo.device)
-                        print("mask", m.device)
-                        assert False
                         idx_right = list(bo + ~m)[idx_left:].index(True) + idx_left
 
                 except ValueError:
