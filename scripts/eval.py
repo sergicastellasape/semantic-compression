@@ -130,6 +130,7 @@ metrics_dict, compression_dict = eval_model_on_DF(
     batch_size=16,
     compression=args.eval_comp,
     return_comp_rate=True,
+    max_length=model_config['max_length'],
     device=device,
 )
 logging.info(f"Full test set losses: {metrics_dict}")

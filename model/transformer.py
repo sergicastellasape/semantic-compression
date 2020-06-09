@@ -23,9 +23,9 @@ class Transformer(nn.Module):
         self.tokenizer = tokenizer_class.from_pretrained(pre_trained_weights)
         self.output_layer = output_layer
 
-    def forward(self, batch_sequences, return_extras=False):
+    def forward(self, batch_sequences, return_extras=False, max_length=256):
         # return_extras: add returning the masks_dict and the token_ids
-        batch_input_ids, masks_dict = self.batch_encode(batch_sequences)
+        batch_input_ids, masks_dict = self.batch_encode(batch_sequences, max_length=max_length)
         hidden_states_tup = self.model(
             batch_input_ids, attention_mask=masks_dict["padding_mask"]
         )[-1]
@@ -35,22 +35,23 @@ class Transformer(nn.Module):
         else:
             return hidden_states_tup[self.output_layer]
 
-    def batch_encode(self, batch_sequences):
+    def batch_encode(self, batch_sequences, max_length=256):
         encoded_inputs_dict = self.tokenizer.batch_encode_plus(
             batch_text_or_text_pairs=batch_sequences,
             add_special_tokens=True,
             return_special_tokens_mask=True,
             return_token_type_ids=True,
+            max_length=max_length,
         )
 
         batch_input_ids = encoded_inputs_dict["input_ids"]
 
         # get maximum sequence length in the batch to add extra padding
-        max_length = max([len(seq) for seq in batch_input_ids])
+        seq_max_length = max([len(seq) for seq in batch_input_ids])
 
         # add -1 to identify the padding part
         batch_padded_token_type_ids = [
-            L + [-1] * (max_length - len(L))
+            L + [-1] * (seq_max_length - len(L))
             for L in encoded_inputs_dict["token_type_ids"]
         ]
 
@@ -62,7 +63,7 @@ class Transformer(nn.Module):
         for input_ids in batch_input_ids:
             padded_input_dict = self.tokenizer.prepare_for_model(
                 input_ids,
-                max_length=max_length,
+                max_length=seq_max_length,
                 pad_to_max_length=True,
                 truncation_strategy="do_not_truncate",
                 add_special_tokens=False,

@@ -216,7 +216,8 @@ while not finished_training:
     batch_predictions = model.forward(batch_sequences,
                                       batch_slices=batch_slices,
                                       compression=args.train_comp,
-                                      return_comp_rate=False)
+                                      return_comp_rate=False,
+                                      max_length=model_config['max_length'])
     L = model.loss(batch_predictions, batch_targets, weights=None)
     metrics = model.metrics(batch_predictions, batch_targets)
 
@@ -231,7 +232,7 @@ while not finished_training:
     scheduler.step()
     batch_loss += L.item()
 
-    if (global_counter % args.evalperiod == 0) and (global_counter != 0):
+    if (global_counter % args.evalperiod == 0):  # and (global_counter != 0):
         logging.info(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
@@ -246,6 +247,7 @@ while not finished_training:
             global_counter=global_counter,
             compression=args.eval_comp,
             return_comp_rate=True,
+            max_length=model_config['max_length'],
             device=device,
         )
         avg_acc = sum(metrics_dict.values()) / len(metrics_dict)
