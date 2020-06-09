@@ -321,7 +321,7 @@ class FreqChunker(nn.Module):
             keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach()
 
         # 'the' is the first wordpiece token at position 1996
-        token_log_likelihoods = log_zipf_law(token_ids, rank_first=1996)
+        token_log_likelihoods = log_zipf_law(token_ids.cpu(), rank_first=1996)
 
         indices_to_compact = []
         for b in range(batch_size):
