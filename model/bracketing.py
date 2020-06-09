@@ -327,7 +327,11 @@ class FreqChunker(nn.Module):
         for b in range(batch_size):
             # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
             m = keep_mask[b, :]
-            sums = torch.tensor([token_log_likelihoods[b, :i].detach().sum(dim=-1) for i in range(0, len(m))])
+            sums = torch.tensor(
+                [token_log_likelihoods[b, :i].detach().sum(dim=-1)
+                    for i in range(0, len(m))],
+                device=self.device
+            )
             idx_left, idx_right, finished, idxs_b = 0, 0, False, []
             while idx_right < len(m):
                 try:
