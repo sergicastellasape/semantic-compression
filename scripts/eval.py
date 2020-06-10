@@ -133,6 +133,7 @@ metrics_dict, compression_dict = eval_model_on_DF(
     max_length=model_config['max_length'],
     device=device,
 )
+logging.info(f"Full test set compressions: {compression_dict}")
 logging.info(f"Full test set losses: {metrics_dict}")
 
 if args.write_google_sheet:

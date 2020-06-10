@@ -293,6 +293,7 @@ if args.full_test_eval:
         return_comp_rate=True,
         device=device,
     )
+    logging.info(f"Full test set compressions: {compression_dict}")
     logging.info(f"Full test set losses: {metrics_dict}")
     writer.add_scalars(f"metrics/test/{args.run_id}", metrics_dict, 0)
 
