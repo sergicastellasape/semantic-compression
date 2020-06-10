@@ -13,22 +13,22 @@ class EmbeddingGenerator(nn.Module):
     def __init__(self, pool_function=abs_max_pooling, device=torch.device("cpu")):
         super().__init__()
         try:
-            t = torch.rand((16, 50, 768))
-            _ = pool_function(t)
+            T = torch.rand((50, 768))
+            _ = pool_function(T, dim=0, token_ids=torch.randint(30000, (50,)))
             self.pool_function = pool_function
             self.device = device
         except Exception as error:
             raise ValueError("The pool_function seems to not work!")
 
-    def forward(self, input_tensors, indices, masks_dict=None):
+    def forward(self, input_tensors, indices, masks_dict=None, token_ids=None):
         assert masks_dict is not None
         compact_representation, compact_masks_dict, compression_rate = self.generate(
-            input_tensors, indices, masks_dict=masks_dict
+            input_tensors, indices, masks_dict=masks_dict, token_ids=token_ids
         )
         return compact_representation, compact_masks_dict, compression_rate.item()
 
     def generate(
-        self, tensors_batch, indices_batch, masks_dict=None
+        self, tensors_batch, indices_batch, masks_dict=None, token_ids=None
     ):
         # tensors_batch.shape() = batch, seq_length, embedding_size
         # indices batch: list of lists of tuples
@@ -53,7 +53,8 @@ class EmbeddingGenerator(nn.Module):
             for i, idx_tuple in enumerate(chunk_indices):
                 # Apply pooling function for the group of tensors
                 joint = self.pool_function(
-                    tensors_batch[b, idx_tuple, :], dim=0)  # idx_tuple dimension
+                    tensors_batch[b, idx_tuple, :], dim=0,
+                    token_ids=token_ids[b, idx_tuple])  # idx_tuple dimension
                 compact_tensors_batch[b, i, :] = joint.requires_grad_(True)
 
                 # Make sure we're not mixing up regular tokens, special tokens

@@ -174,20 +174,27 @@ def txt2list(txt_path=None):
     return sentences
 
 
-def abs_max_pooling(T, dim=-1, keepdim=False):
+def abs_max_pooling(T, dim=-1, keepdim=False, **kwargs):
     # Reduce with absolute max pooling over the specified dimension
     abs_max, _ = torch.max(T.abs(), dim=dim, keepdim=True)
     bool_mask = T.abs() >= abs_max
     return (T * bool_mask).sum(dim=dim, keepdim=keepdim)
 
 
-def mean_pooling(T, dim=-1, keepdim=False):
+def mean_pooling(T, dim=-1, keepdim=False, **kwargs):
     return T.mean(dim=dim, keepdim=keepdim)
 
+def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
+    a = 1e-4
+    log_p = log_zipf_law(token_ids.unsqueeze(-1))
+    weights = a / (torch.exp(log_p) + a)  # Strategy from Arora et al 2018.
+    weights /= weights.norm(p=1, dim=dim)  # normalize so they add up to 1
+    return (T * weights).sum(dim=dim, keepdim=keepdim)
 
-def log_zipf_law(inp, alpha=1., ct=1., rank_first=1996):
+def log_zipf_law(inp, alpha=1., log_ct=-1.0, rank_first=1996):
+    # Log_ct is the term reflecting the probability of the element of rank = 1
+    # log p("the") = log 0.02 = -2.7, for reference
     ranks = (inp - rank_first) * (inp > rank_first) + 1.
-    log_ct = torch.log(torch.tensor(ct, dtype=torch.float32, device=inp.device))
     log_rank = torch.log(ranks.float())
     return log_ct - alpha * log_rank
 

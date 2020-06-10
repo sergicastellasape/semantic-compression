@@ -58,7 +58,8 @@ class End2EndModel(nn.Module):
                 comp_rate,
             ) = self.generator.forward(context_representation,
                                        indices,
-                                       masks_dict=masks_dict)
+                                       masks_dict=masks_dict,
+                                       token_ids=batch_input_ids)
         else:
             comp_rate = 1
             compact_representation = context_representation
