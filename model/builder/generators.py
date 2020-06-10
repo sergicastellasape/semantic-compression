@@ -4,7 +4,7 @@ from ..generators import (
     ConvAtt,
     IdentityGenerator
 )
-from ..utils import abs_max_pooling, mean_pooling
+from ..utils import abs_max_pooling, mean_pooling, freq_pooling
 
 def make_generator(args, device=None):
     assert device is not None
@@ -12,7 +12,8 @@ def make_generator(args, device=None):
     embedding_dim = 768  # hardcoded for now
     pooling_fn = {
         'abs_max_pooling': abs_max_pooling,
-        'mean_pooling': mean_pooling
+        'mean_pooling': mean_pooling,
+        'freq_pooling': freq_pooling
     }
     pooling_nn = {
         'conv_att': ConvAtt
