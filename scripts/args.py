@@ -185,6 +185,14 @@ parser.add_argument(
     help="Set the datasets to train on.",
 )
 parser.add_argument(
+    "--write-google-sheet",
+    "-GS",
+    required=False,
+    action='store_true',
+    dest="write_google_sheet",
+    help="Flag to write on Google Sheet",
+)
+parser.add_argument(
     "--log-level",
     "-log",
     default='info',

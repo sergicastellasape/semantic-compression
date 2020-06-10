@@ -20,6 +20,7 @@ from transformers import BertModel, BertTokenizer
 # Custom imports
 sys.path.append(".")  # Add parent directory to sys.path to import from root dir
 from model.model import End2EndModel
+from model.utils import write_google_sheet
 
 # Neural Network Builder functions
 from model.builder.transformer import make_transformer
@@ -37,7 +38,7 @@ from model.utils import (
 )
 
 # Import comand line arguments
-from args_eval import args, LOGGING_PATH
+from args import args, LOGGING_PATH
 log_level = {
     'debug': logging.DEBUG,
     'info': logging.INFO,
@@ -71,6 +72,9 @@ else:
 if args.eval_comp:
     assert args.pooling is not None
     assert args.chunker is not None
+
+if args.write_google_sheet:
+    assert int(args.run_id[-1]), "Run identifier must end with version number from 0 to 9!"
 
 ################################################################################
 ################################ LOAD DATASETS #################################
@@ -126,6 +130,15 @@ metrics_dict, compression_dict = eval_model_on_DF(
     batch_size=16,
     compression=args.eval_comp,
     return_comp_rate=True,
+    max_length=model_config['max_length'],
     device=device,
 )
 logging.info(f"Full test set losses: {metrics_dict}")
+
+if args.write_google_sheet:
+    row = args.trf_out_layer + 2
+    run_v = int(args.run_id[-1])
+    write_google_sheet(metrics_dict,
+                       row=row,
+                       name=config['google_sheet']['name'],
+                       sheet_name=f'run{run_v}')

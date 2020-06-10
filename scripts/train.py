@@ -20,6 +20,7 @@ from transformers import BertModel, BertTokenizer
 # Custom imports
 sys.path.append(".")  # Add parent directory to sys.path to import from root dir
 from model.model import End2EndModel
+from model.utils import write_google_sheet
 
 # Neural Network Builder functions
 from model.builder.transformer import make_transformer
@@ -37,7 +38,7 @@ from model.utils import (
 )
 
 # Import comand line arguments
-from args_train import args, LOGGING_PATH
+from args import args, LOGGING_PATH
 log_level = {
     'debug': logging.DEBUG,
     'info': logging.INFO,
@@ -72,6 +73,9 @@ else:
 if args.train_comp or args.eval_comp:
     assert args.pooling is not None
     assert args.chunker is not None
+
+if args.write_google_sheet:
+    assert int(args.run_id[-1]), "Run identifier must end with version number from 0 to 9!"
 
 ################################################################################
 ################################ LOAD DATASETS #################################
@@ -212,7 +216,8 @@ while not finished_training:
     batch_predictions = model.forward(batch_sequences,
                                       batch_slices=batch_slices,
                                       compression=args.train_comp,
-                                      return_comp_rate=False)
+                                      return_comp_rate=False,
+                                      max_length=model_config['max_length'])
     L = model.loss(batch_predictions, batch_targets, weights=None)
     metrics = model.metrics(batch_predictions, batch_targets)
 
@@ -227,7 +232,7 @@ while not finished_training:
     scheduler.step()
     batch_loss += L.item()
 
-    if (global_counter % args.evalperiod == 0) and (global_counter != 0):
+    if (global_counter % args.evalperiod == 0):  # and (global_counter != 0):
         logging.info(
             f"################### GLOBAL COUNTER {global_counter} ###################"
         )
@@ -242,6 +247,7 @@ while not finished_training:
             global_counter=global_counter,
             compression=args.eval_comp,
             return_comp_rate=True,
+            max_length=model_config['max_length'],
             device=device,
         )
         avg_acc = sum(metrics_dict.values()) / len(metrics_dict)
@@ -289,3 +295,11 @@ if args.full_test_eval:
     )
     logging.info(f"Full test set losses: {metrics_dict}")
     writer.add_scalars(f"metrics/test/{args.run_id}", metrics_dict, 0)
+
+    if args.write_google_sheet:
+        row = args.trf_out_layer + 2
+        run_v = int(args.run_id[-1])
+        write_google_sheet(metrics_dict,
+                           row=row,
+                           name=config['google_sheet']['name'],
+                           sheet_name=f'run{run_v}')

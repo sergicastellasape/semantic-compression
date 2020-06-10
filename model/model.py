@@ -38,12 +38,13 @@ class End2EndModel(nn.Module):
         batch_slices=None,
         compression=None,
         return_comp_rate=False,
+        max_length=256,
     ):
 
         assert compression in [True, False]
         assert batch_slices is not None
         context_representation, masks_dict, batch_input_ids = self.transformer.forward(
-            sequences_batch, return_extras=True
+            sequences_batch, return_extras=True, max_length=max_length,
         )
 
         if compression:

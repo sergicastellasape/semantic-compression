@@ -316,31 +316,31 @@ class FreqChunker(nn.Module):
         batch_size = inp.size(0)
 
         if not mask_special_tokens:
-            keep_mask = (masks_dict['padding_mask'] == 1).detach()
+            keep_mask = (masks_dict['padding_mask'] == 1).detach().cpu()
         else:
-            keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach()
+            keep_mask = (masks_dict['regular_tokens_mask'] == 1).detach().cpu()
 
         # 'the' is the first wordpiece token at position 1996
-        token_log_likelihoods = log_zipf_law(token_ids, rank_first=1996)
+        token_log_likelihoods = log_zipf_law(token_ids.cpu(), rank_first=1996)
 
         indices_to_compact = []
         for b in range(batch_size):
             # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
             m = keep_mask[b, :]
-            sums = torch.tensor([token_log_likelihoods[b, :i].detach().sum(dim=-1) for i in range(0, len(m))])
+            sums = torch.tensor([token_log_likelihoods[b, :i].sum(dim=-1)
+                    for i in range(0, len(m))], device=token_log_likelihoods.device)
             idx_left, idx_right, finished, idxs_b = 0, 0, False, []
             while idx_right < len(m):
                 try:
-                    idx_right = list((sums < self.log_threshold) * m + ~m).index(True)
-                    idx_right = idx_left + 1 if idx_right == idx_left else idx_right
+                    if m[idx_left] == 0:
+                        idx_right = idx_left + 1
+                    elif m[idx_left] == 1:
+                        bo = (sums - sums[idx_left]) < self.log_threshold
+                        idx_right = list(bo + ~m)[idx_left:].index(True) + idx_left
 
-                # if no point to the right is a good boundary for a chunk it
-                # means all the sequence is a chunk
                 except ValueError:
                     idx_right = len(m)
-
-                idxs_b.append(tuple(range(idx_left, idx_right)))
-                sums[:idx_right], m[:idx_right] = 0, True
+                idxs_b.append(list(range(idx_left, idx_right)))
                 idx_left = idx_right
 
             indices_to_compact.append(idxs_b)

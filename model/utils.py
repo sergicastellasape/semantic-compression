@@ -3,6 +3,8 @@ Collection of useful little functions.
 """
 import argparse
 from collections import defaultdict
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 import re
 import time
 from tqdm import tqdm
@@ -22,6 +24,7 @@ def eval_model_on_DF(
     global_counter=0,
     compression=None,
     return_comp_rate=False,
+    max_length=256,
     device=torch.device("cpu"),
 ):
 
@@ -53,6 +56,7 @@ def eval_model_on_DF(
                     batch_slices=batch_slices,
                     compression=compression,
                     return_comp_rate=return_comp_rate,
+                    max_length=max_length,
                 )
                 L = model.loss(batch_predictions, batch_targets, weights=None)
                 m = model.metrics(batch_predictions, batch_targets)
@@ -70,6 +74,14 @@ def eval_model_on_DF(
         return metrics_dict, compression_dict
     else:
         return metrics_dict
+
+def write_google_sheet(results_dict, row=2, name='results_layers', sheet_name='run1'):
+    # Google API stuff
+    scope = ["https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name('config/gcp-credentials.json', scope)
+    client = gspread.authorize(creds)
+    sheet = client.open(name).worksheet(sheet_name)
+    sheet.update(f'B{row}:D{row}', [list(results_dict.values())])
 
 
 def make_connectivity_matrix(length, span=1):
@@ -175,7 +187,7 @@ def mean_pooling(T, dim=-1, keepdim=False):
 
 def log_zipf_law(inp, alpha=1., ct=1., rank_first=1996):
     ranks = (inp - rank_first) * (inp > rank_first) + 1.
-    log_ct = torch.log(torch.tensor(ct, dtype=torch.float32))
+    log_ct = torch.log(torch.tensor(ct, dtype=torch.float32, device=inp.device))
     log_rank = torch.log(ranks.float())
     return log_ct - alpha * log_rank
 
