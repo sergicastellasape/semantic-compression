@@ -185,6 +185,10 @@ def mean_pooling(T, dim=-1, keepdim=False, **kwargs):
     return T.mean(dim=dim, keepdim=keepdim)
 
 def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
+<<<<<<< HEAD
+=======
+    #assert T.size() == token_ids.size(), ""
+>>>>>>> 6ade8c286229ab1065565a569dc2d3ed20f5a06d
     a = 1e-4
     log_p = log_zipf_law(token_ids.unsqueeze(-1))
     weights = a / (torch.exp(log_p) + a)
