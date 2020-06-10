@@ -322,20 +322,19 @@ class FreqChunker(nn.Module):
 
         # 'the' is the first wordpiece token at position 1996
         token_log_likelihoods = log_zipf_law(token_ids.cpu(), rank_first=1996)
-
+        sums = torch.stack([token_log_likelihoods[:, :i].sum(dim=-1)
+                            for i in range(0, keep_mask.size(-1))], dim=-1)
         indices_to_compact = []
         for b in range(batch_size):
             # m = [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
             m = keep_mask[b, :]
-            sums = torch.tensor([token_log_likelihoods[b, :i].sum(dim=-1)
-                    for i in range(0, len(m))], device=token_log_likelihoods.device)
             idx_left, idx_right, finished, idxs_b = 0, 0, False, []
             while idx_right < len(m):
                 try:
                     if m[idx_left] == 0:
                         idx_right = idx_left + 1
                     elif m[idx_left] == 1:
-                        bo = (sums - sums[idx_left]) < self.log_threshold
+                        bo = (sums[b, :] - sums[b, idx_left]) < self.log_threshold
                         idx_right = list(bo + ~m)[idx_left:].index(True) + idx_left
 
                 except ValueError:

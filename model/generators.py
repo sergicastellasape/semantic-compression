@@ -13,8 +13,8 @@ class EmbeddingGenerator(nn.Module):
     def __init__(self, pool_function=abs_max_pooling, device=torch.device("cpu")):
         super().__init__()
         try:
-            T = torch.rand((16, 50, 768))
-            _ = pool_function(T, token_ids=torch.randint(30000, (16, 50)))
+            T = torch.rand((50, 768))
+            _ = pool_function(T, dim=0, token_ids=torch.randint(30000, (50,)))
             self.pool_function = pool_function
             self.device = device
         except Exception as error:
