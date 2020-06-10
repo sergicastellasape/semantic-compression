@@ -181,9 +181,15 @@ def abs_max_pooling(T, dim=-1, keepdim=False):
     return (T * bool_mask).sum(dim=dim, keepdim=keepdim)
 
 
-def mean_pooling(T, dim=-1, keepdim=False):
+def mean_pooling(T, dim=-1, keepdim=False, **kwargs):
     return T.mean(dim=dim, keepdim=keepdim)
 
+def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
+    #assert T.size() == token_ids.size(), ""
+    a = 1e-4
+    log_p = log_zipf_law(token_ids.unsqueeze(-1))
+    weights = a / (torch.exp(log_p) + a)
+    return (T * weights).sum(dim=dim, keepdim=keepdim)
 
 def log_zipf_law(inp, alpha=1., ct=1., rank_first=1996):
     ranks = (inp - rank_first) * (inp > rank_first) + 1.

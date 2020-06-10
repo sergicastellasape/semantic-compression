@@ -74,7 +74,7 @@ parser.add_argument(
     type=str,
     default=None,
     required=False,
-    choices=["abs_max_pooling", "mean_pooling", "conv_att"],
+    choices=["abs_max_pooling", "mean_pooling", "freq_pooling", "conv_att"],
     help="function to do the generation"
 )
 parser.add_argument(
