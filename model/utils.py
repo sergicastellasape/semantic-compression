@@ -174,7 +174,7 @@ def txt2list(txt_path=None):
     return sentences
 
 
-def abs_max_pooling(T, dim=-1, keepdim=False):
+def abs_max_pooling(T, dim=-1, keepdim=False, **kwargs):
     # Reduce with absolute max pooling over the specified dimension
     abs_max, _ = torch.max(T.abs(), dim=dim, keepdim=True)
     bool_mask = T.abs() >= abs_max
@@ -185,7 +185,6 @@ def mean_pooling(T, dim=-1, keepdim=False, **kwargs):
     return T.mean(dim=dim, keepdim=keepdim)
 
 def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
-    #assert T.size() == token_ids.size(), ""
     a = 1e-4
     log_p = log_zipf_law(token_ids.unsqueeze(-1))
     weights = a / (torch.exp(log_p) + a)
