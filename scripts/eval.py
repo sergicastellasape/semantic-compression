@@ -104,6 +104,7 @@ model = End2EndModel(transformer=transformer_net,
 
 logging.info(f"Compression in Training: {args.train_comp}")
 logging.info(f"Compression in Evaluation: {args.eval_comp}")
+logging.info(f"Transformer Layer used: {args.trf_out_layer}")
 
 ################################################################################
 ############################## DEFINE CONSTANTS ################################
