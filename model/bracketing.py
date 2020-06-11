@@ -325,8 +325,7 @@ class FreqChunker(nn.Module):
 
         # 'the' is the first wordpiece token at position 1996
         token_log_likelihoods = log_zipf_law(token_ids.cpu(), rank_first=1996) * keep_mask
-        sums = torch.stack([token_log_likelihoods[:, :i].sum(dim=-1)
-                            for i in range(0, keep_mask.size(-1))], dim=-1)
+        sums = token_log_likelihoods.cumsum(dim=-1)
 
         indices_to_compact = []
         for b in range(batch_size):
