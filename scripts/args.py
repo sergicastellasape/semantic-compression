@@ -21,7 +21,16 @@ parser.add_argument(
     type=float,
     default=None,
     required=False,
-    help="Similarity threshold used for chunking in the embedding space.",
+    help="Similarity threshold used for NNsim chunking in the embedding space.",
+)
+parser.add_argument(
+    "--distance-threshold",
+    "-distthr",
+    dest="dist_threshold",
+    type=float,
+    default=None,
+    required=False,
+    help="Distance threshold used for agglomerative chunking in the embedding space.",
 )
 parser.add_argument(
     "--log-threshold",
