@@ -24,7 +24,7 @@ parser.add_argument(
     help="Similarity threshold used for NNsim chunking in the embedding space.",
 )
 parser.add_argument(
-    "--distance-threshold",
+    "--dist-threshold",
     "-distthr",
     dest="dist_threshold",
     type=float,
