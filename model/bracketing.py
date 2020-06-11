@@ -127,13 +127,14 @@ class AgglomerativeClusteringChunker(nn.Module):
     matrix. So the code is UGLY... but I needed to implement somehow the option to
     remove the special tokens and also prevent merging seq pairs...
     """
-    def __init__(self, threshold=0.9, max_skip=4, device=torch.device("cpu")):
+    def __init__(self, threshold=0.9, max_skip=4, normalize=True, device=torch.device("cpu")):
         super().__init__()
         self.device = device
         # agg clustering wants distance not similarity
         # self.dist_threshold = 1 - threshold
         self.dist_threshold = threshold
         self.span = max_skip
+        self.normalize = normalize
         self.id = nn.Identity()
 
     def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
@@ -147,6 +148,8 @@ class AgglomerativeClusteringChunker(nn.Module):
         special_tokens = masks_dict['padding_mask'].detach().cpu().numpy() - keep_mask
         full_seq_pair_mask = masks_dict['seq_pair_mask'].detach().cpu().numpy()
         indices_to_compact = []
+        if self.normalize:
+            inp /= inp.norm(p=2, dim=-1, keepdim=True)
         # loop over each element in batch, I know. it's a shame this is sequential
         for b, embeddings in enumerate(inp.detach().cpu().numpy()):
             filtered_embedding = embeddings[keep_mask[b, :], :]
@@ -157,7 +160,7 @@ class AgglomerativeClusteringChunker(nn.Module):
             # iterate for the different values in seq_pair_mask, which will be
             # either [0] or [0, 1], so loop over each seq in the seq pair (if any)
             L, max_L = [], 0
-            for i in list(Counter(seq_pair_mask).keys()):
+            for i in list(Counter(seq_pair_mask).keys()):  # loop if two seq.
                 mask = seq_pair_mask == i
                 length = sum(mask)
                 connectivity_matrix = make_connectivity_matrix(length,
