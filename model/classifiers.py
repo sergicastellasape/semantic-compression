@@ -70,21 +70,21 @@ class BiLSTMClassifier(nn.Module):
     def loss(self, predicted, target):
         return self.loss_fn(predicted, target)
 
-    def forward(self, input, pooling=None, masks_dict=None, **kwargs):
+    def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
         assert masks_dict is not None
         # Calculate original lengths
-        collapse_embedding_dim_tensors = input.sum(
+        collapse_embedding_dim_tensors = inp.sum(
             dim=2
         )  # all elements in the embedding need to be 0
         B = (
-            torch.zeros_like(input[:, :, 0]) != collapse_embedding_dim_tensors
+            torch.zeros_like(inp[:, :, 0]) != collapse_embedding_dim_tensors
         )  # this gives a boolean matrix of size (batch, max_seq_length)
         lengths = B.sum(dim=1).to(
             device=self.device
         )  # summing the dimension of sequence length gives the original length
 
         packed_tensors = hotfix_pack_padded_sequence(
-            input, lengths, enforce_sorted=False, batch_first=True
+            inp, lengths, enforce_sorted=False, batch_first=True
         )
 
         # detach to make the computation graph for the backward pass only for 1 sequence
@@ -354,7 +354,7 @@ class SeqPairAttentionClassifier(nn.Module):
     def loss(self, prediction, target):
         return self.loss_fn(prediction, target)
 
-    def forward(self, input, masks_dict=None, **kwargs):
+    def forward(self, inp, masks_dict=None, **kwargs):
         """
         Input_tup should be a tuple of two tensors, containing the batches
         """
@@ -362,11 +362,11 @@ class SeqPairAttentionClassifier(nn.Module):
 
         # seq_pair_mask looks like [00000000001111111111] so for the second sentence
         # one needs to multiply by the mask and for the first one it's the negation
-        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(input.size()).to(self.device)
-        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(input.size()).to(self.device)
+        mask_2 = (seq_pair_mask == 1).unsqueeze(-1).expand(inp.size()).to(self.device)
+        mask_1 = (seq_pair_mask == 0).unsqueeze(-1).expand(inp.size()).to(self.device)
 
-        inp_tensor1 = input * mask_1
-        inp_tensor2 = input * mask_2
+        inp_tensor1 = inp * mask_1
+        inp_tensor2 = inp * mask_2
 
         # concatenate along sequence length dimension so attention is calculated
         # along both positive and negative sentiments
