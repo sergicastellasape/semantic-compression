@@ -111,7 +111,7 @@ class ParamEmbeddingGenerator(nn.Module):
         self.device = device
         self.gen_net = gen_net(embedding_dim=embedding_dim, device=device).to(device)
 
-    def forward(self, tensors_batch, indices_batch, masks_dict=None):
+    def forward(self, tensors_batch, indices_batch, masks_dict=None, **kwargs):
         # tensors_batch.shape() = batch, seq_length, embedding_size
         # indices batch: list of lists of tuples
         # [[(0,), (1,), (2, 3, 4), (5,), (6,)], [(etc.)]]
@@ -199,7 +199,7 @@ class ConvAtt(nn.Module):
             init_normal.detach().requires_grad_(True).to(device)
         )
 
-    def forward(self, inp, mask=None):
+    def forward(self, inp, mask=None, **kwargs):
         if mask is None:
             mask = torch.ones_like(inp, dtype=torch.int8)
 
