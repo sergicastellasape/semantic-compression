@@ -51,17 +51,16 @@ class BiLSTMClassifier(nn.Module):
 
         # The linear layer that maps from hidden state space to sentiment classification space
         self.hidden2sent = nn.Linear(hidden_dim * self.directions, sentset_size)
-        self.hidden = self.init_hidden()
         self.loss_fn = nn.NLLLoss(reduction="mean")
 
-    def init_hidden(self):
+    def init_hidden(self, batch_size):
 
         # As of the documentation from nn.LSTM in pytorch, the input to the lstm cell is
         # the input and a tuple of (h, c) hidden state and memory state. We initialize that
         # tuple with the proper shape: num_layers*directions, batch_size, hidden_dim. Don't worry
         # that the batch here is second, this is dealt with internally if the lstm is created with
         # batch_first=True
-        shape = (self.num_layers * self.directions, self.batch_size, self.hidden_dim)
+        shape = (self.num_layers * self.directions, batch_size, self.hidden_dim)
         return (
             torch.zeros(shape, requires_grad=True, device=self.device),
             torch.zeros(shape, requires_grad=True, device=self.device),
@@ -73,24 +72,20 @@ class BiLSTMClassifier(nn.Module):
     def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
         assert masks_dict is not None
         # Calculate original lengths
-        collapse_embedding_dim_tensors = inp.sum(
-            dim=2
-        )  # all elements in the embedding need to be 0
-        B = (
-            torch.zeros_like(inp[:, :, 0]) != collapse_embedding_dim_tensors
-        )  # this gives a boolean matrix of size (batch, max_seq_length)
-        lengths = B.sum(dim=1).to(
-            device=self.device
-        )  # summing the dimension of sequence length gives the original length
+        collapse_embedding_dim_tensors = inp.sum(dim=2)
+        # all elements in the embedding need to be 0
+        B = (torch.zeros_like(inp[:, :, 0]) != collapse_embedding_dim_tensors)
+        # this gives a boolean matrix of size (batch, max_seq_length)
+        lengths = B.sum(dim=1)  # summing the dimension of sequence length gives the original length
 
         packed_tensors = hotfix_pack_padded_sequence(
             inp, lengths, enforce_sorted=False, batch_first=True
         )
 
         # detach to make the computation graph for the backward pass only for 1 sequence
-        self.init_hidden()
-        h, c = self.hidden[0].detach(), self.hidden[1].detach()
-        lstm_out, self.hidden = self.lstm(packed_tensors, (h, c))
+        hidden, cell = self.init_hidden(inp.size(0))  # feed with batch_size
+        lstm_out, (hidden_out, cell_out) = self.lstm(packed_tensors,
+                                                    (hidden.detach(), c.detach()))
 
         # we unpack and use the last lstm output for classification
         unpacked_output = torch.nn.utils.rnn.pad_packed_sequence(

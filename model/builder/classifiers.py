@@ -9,15 +9,16 @@ from ..classifiers import (
 from ..utils import abs_max_pooling
 
 
-def make_BiLSTMClassifier(*args, device, **kwargs):
-    raise NotImplementedError()
+def make_BiLSTMClassifier(num_classes, task=None, device=None):
+    assert task is not None
+    assert device is not None
+    assert num_classes is not None
     return BiLSTMClassifier(768,
                             hidden_dim=768,
-                            sentset_size=2,
+                            sentset_size=num_classes,
                             num_layers=2,
-                            batch_size=16,
                             bidirectional=True,
-                            dropout=0.0,
+                            dropout=0.3,
                             device=device)
 
 
