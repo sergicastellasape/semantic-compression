@@ -18,6 +18,7 @@ class BiLSTMClassifier(nn.Module):
         num_layers,
         task=None,
         bidirectional=True,
+        mask_special_tokens=True,
         dropout=0.0,
         device=torch.device("cpu"),
     ):
@@ -27,6 +28,7 @@ class BiLSTMClassifier(nn.Module):
         self.device = device
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.mask_special_tokens = mask_special_tokens
         if bidirectional:
             self.directions = 2
         else:
@@ -69,17 +71,16 @@ class BiLSTMClassifier(nn.Module):
 
     def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
         assert masks_dict is not None
+
+        if self.mask_special_tokens:
+            inp *= (masks_dict['regular_tokens_mask'] == 1).unsqueeze(-1)
+
         # Calculate original lengths
-        collapse_embedding_dim_tensors = inp.sum(dim=2)
-        # all elements in the embedding need to be 0
-        B = (torch.zeros_like(inp[:, :, 0]) != collapse_embedding_dim_tensors)
-        # this gives a boolean matrix of size (batch, max_seq_length)
-        lengths = B.sum(dim=1)  # summing the dimension of sequence length gives the original length
+        lengths = (masks_dict['padding_mask'] == 1).sum(dim=1)
 
         packed_tensors = hotfix_pack_padded_sequence(
             inp, lengths, enforce_sorted=False, batch_first=True
         )
-
         # detach to make the computation graph for the backward pass only for 1 sequence
         hidden, cell = self.init_hidden(inp.size(0))  # feed with batch_size
         lstm_out, (hidden_out, cell_out) = self.lstm(packed_tensors,
