@@ -16,7 +16,6 @@ class BiLSTMClassifier(nn.Module):
         hidden_dim,
         sentset_size,
         num_layers,
-        batch_size,
         task=None,
         bidirectional=True,
         dropout=0.0,
@@ -27,7 +26,6 @@ class BiLSTMClassifier(nn.Module):
         self.task = task
         self.device = device
         self.hidden_dim = hidden_dim
-        self.batch_size = batch_size
         self.num_layers = num_layers
         if bidirectional:
             self.directions = 2
@@ -85,7 +83,7 @@ class BiLSTMClassifier(nn.Module):
         # detach to make the computation graph for the backward pass only for 1 sequence
         hidden, cell = self.init_hidden(inp.size(0))  # feed with batch_size
         lstm_out, (hidden_out, cell_out) = self.lstm(packed_tensors,
-                                                    (hidden.detach(), c.detach()))
+                                                    (hidden.detach(), cell.detach()))
 
         # we unpack and use the last lstm output for classification
         unpacked_output = torch.nn.utils.rnn.pad_packed_sequence(
