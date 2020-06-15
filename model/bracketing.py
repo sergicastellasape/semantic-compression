@@ -149,9 +149,11 @@ class AgglomerativeClusteringChunker(nn.Module):
         full_seq_pair_mask = masks_dict['seq_pair_mask'].detach().cpu().numpy()
         indices_to_compact = []
         if self.normalize:
-            inp /= inp.norm(p=2, dim=-1, keepdim=True)
+            norm_inp = (inp / inp.norm(p=2, dim=-1, keepdim=True)).detach().cpu()
+        else:
+            norm_inp = inp.detach().cpu()
         # loop over each element in batch, I know. it's a shame this is sequential
-        for b, embeddings in enumerate(inp.detach().cpu().numpy()):
+        for b, embeddings in enumerate(norm_inp.numpy()):
             filtered_embedding = embeddings[keep_mask[b, :], :]
             # remove pad and special tokens if necessary
             seq_pair_mask = full_seq_pair_mask[b, keep_mask[b, :]]
@@ -342,7 +344,7 @@ class FreqChunker(nn.Module):
 
                 except ValueError:
                     idx_right = len(m)
-                idxs_b.append(list(range(idx_left, idx_right)))
+                idxs_b.append(tuple(range(idx_left, idx_right)))
                 idx_left = idx_right
 
             indices_to_compact.append(idxs_b)
