@@ -17,6 +17,7 @@ def make_BiLSTMClassifier(num_classes=None, task=None, device=None):
                             hidden_dim=768,
                             sentset_size=num_classes,
                             num_layers=2,
+                            pooling="max_pooling",
                             task=task,
                             bidirectional=True,
                             dropout=0.3,

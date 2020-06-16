@@ -16,6 +16,7 @@ class BiLSTMClassifier(nn.Module):
         hidden_dim,
         sentset_size,
         num_layers,
+        pooling=None,
         task=None,
         bidirectional=True,
         mask_special_tokens=True,
@@ -28,6 +29,7 @@ class BiLSTMClassifier(nn.Module):
         self.device = device
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.pooling = pooling
         self.mask_special_tokens = mask_special_tokens
         if bidirectional:
             self.directions = 2
@@ -69,14 +71,14 @@ class BiLSTMClassifier(nn.Module):
     def loss(self, predicted, target):
         return self.loss_fn(predicted, target)
 
-    def forward(self, inp, pooling=None, masks_dict=None, **kwargs):
+    def forward(self, inp, masks_dict=None, **kwargs):
         assert masks_dict is not None
 
         if self.mask_special_tokens:
-            inp *= (masks_dict['regular_tokens_mask'] == 1).unsqueeze(-1)
+            inp *= masks_dict['regular_tokens_mask'].unsqueeze(-1)
 
         # Calculate original lengths
-        lengths = (masks_dict['padding_mask'] == 1).sum(dim=1)
+        lengths = masks_dict['padding_mask'].sum(dim=1)
 
         packed_tensors = hotfix_pack_padded_sequence(
             inp, lengths, enforce_sorted=False, batch_first=True
@@ -84,20 +86,27 @@ class BiLSTMClassifier(nn.Module):
         # detach to make the computation graph for the backward pass only for 1 sequence
         hidden, cell = self.init_hidden(inp.size(0))  # feed with batch_size
         lstm_out, (hidden_out, cell_out) = self.lstm(packed_tensors,
-                                                    (hidden.detach(), cell.detach()))
+                                                     (hidden, cell))
 
         # we unpack and use the last lstm output for classification
         unpacked_output = torch.nn.utils.rnn.pad_packed_sequence(
             lstm_out, batch_first=True
         )[0]
-
+        #print(lengths - 1)
+        #print(unpacked_output[:, lengths - 2, :].size())
         # max pooling input needs to be (batch, seq_lengh, embedding)
-        if pooling == "max_pooling":
-            sent_space = self.hidden2sent(abs_max_pooling(unpacked_output))
-        elif pooling == "mean_pooling":
+        if self.pooling == "max_pooling":
+            sent_space = self.hidden2sent(abs_max_pooling(unpacked_output, dim=1))
+        elif self.pooling == "mean_pooling":
             sent_space = self.hidden2sent(unpacked_output.mean(dim=1))
         else:
-            sent_space = self.hidden2sent(unpacked_output[:, -1, :])
+            right2left = unpacked_output[:, 1, :]
+            bool_mask = F.one_hot(lengths - 2, num_classes=lengths.max()).unsqueeze(-1)
+            left2right = (unpacked_output * bool_mask).sum(dim=1)
+            # This should be replaced by a concatenation and a different size linear
+            # layer, but I'm not gonna use it for now, so combining the features for now
+            # will do the job
+            sent_space = self.hidden2sent(right2left + left2right)
 
         sent_scores = F.log_softmax(sent_space, dim=1)
 
