@@ -57,11 +57,11 @@ logging.basicConfig(filename=os.path.join(LOGGING_PATH, f'{args.run_id}.txt'),
 logging.getLogger("transformers").setLevel(logging.WARNING)
 
 # load config file from datasets
-with open("./config/datasets.yml", "r") as f:
+with open(f"./config/{args.datasets_config}.yml", "r") as f:
     config = yaml.load(f, Loader=yaml.Loader)
-with open("./config/model.yml", "r") as f:
+with open(f"./config/{args.model_config}.yml", "r") as f:
     model_config = yaml.load(f, Loader=yaml.Loader)
-with open("./config/optimizer.yml", "r") as f:
+with open(f"./config/{args.optimizer_config}.yml", "r") as f:
     optimizer_config = yaml.load(f, Loader=yaml.Loader)
 
 # modify the datasets according to the arg passed

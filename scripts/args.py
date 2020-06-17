@@ -194,6 +194,33 @@ parser.add_argument(
     help="Set the datasets to train on.",
 )
 parser.add_argument(
+    "--model-config",
+    "-mconfig",
+    required=False,
+    default='model',
+    type=str,
+    dest="model_config",
+    help="Name of the model config within the config folder without extension",
+)
+parser.add_argument(
+    "--datasets-config",
+    "-dconfig",
+    required=False,
+    default='datasets',
+    type=str,
+    dest="datasets_config",
+    help="Name of the model config within the config folder without extension",
+)
+parser.add_argument(
+    "--optimizer-config",
+    "-oconfig",
+    required=False,
+    default='optimizer',
+    type=str,
+    dest="optimizer_config",
+    help="Name of the model config within the config folder without extension",
+)
+parser.add_argument(
     "--write-google-sheet",
     "-GS",
     required=False,
