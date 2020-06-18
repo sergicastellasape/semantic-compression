@@ -333,7 +333,7 @@ class DecAttClassifiter_v2(nn.Module):
         self.pool_func = pool_func
 
         # Define 1 -> 2 attention layer
-        self.att12 = nn.MultiHeadAttention(embedding_dim,
+        self.att12 = nn.MultiheadAttention(embedding_dim,
                                            num_heads,
                                            dropout=dropout,
                                            bias=True,
@@ -341,7 +341,7 @@ class DecAttClassifiter_v2(nn.Module):
                                            add_zero_attn=False,
                                            kdim=None,
                                            vdim=None).to(device)
-        self.att21 = nn.MultiHeadAttention(embedding_dim,
+        self.att21 = nn.MultiheadAttention(embedding_dim,
                                            num_heads,
                                            dropout=dropout,
                                            bias=True,
@@ -373,11 +373,11 @@ class DecAttClassifiter_v2(nn.Module):
         att_seq1 = self.att12(inp_tensor1.transpose(0, 1),
                               inp_tensor2.transpose(0, 1),
                               inp_tensor2.transpose(0, 1),
-                              key_padding_mask=mask_2).transpose(0, 1)
+                              key_padding_mask=mask_2)[0].transpose(0, 1)
         att_seq2 = self.att21(inp_tensor2.transpose(0, 1),
                               inp_tensor1.transpose(0, 1),
                               inp_tensor1.transpose(0, 1),
-                              key_padding_mask=mask_1).transpose(0, 1)
+                              key_padding_mask=mask_1)[0].transpose(0, 1)
 
         # Watch out! if you do mean pooling, the padding might give problems!
         aggregation_seq1 = self.pool_func(att_seq1, dim=1)
