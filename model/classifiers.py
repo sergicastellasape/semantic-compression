@@ -372,12 +372,10 @@ class DecAttClassifiter_v2(nn.Module):
         # transpose so batch is second instead of first
         att_seq1 = self.att12(inp_tensor1.transpose(0, 1),
                               inp_tensor2.transpose(0, 1),
-                              inp_tensor2.transpose(0, 1),
-                              key_padding_mask=mask_2)[0].transpose(0, 1)
+                              inp_tensor2.transpose(0, 1))[0].transpose(0, 1)
         att_seq2 = self.att21(inp_tensor2.transpose(0, 1),
                               inp_tensor1.transpose(0, 1),
-                              inp_tensor1.transpose(0, 1),
-                              key_padding_mask=mask_1)[0].transpose(0, 1)
+                              inp_tensor1.transpose(0, 1))[0].transpose(0, 1)
 
         # Watch out! if you do mean pooling, the padding might give problems!
         aggregation_seq1 = self.pool_func(att_seq1, dim=1)
