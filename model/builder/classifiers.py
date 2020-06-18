@@ -4,6 +4,7 @@ from ..classifiers import (
     SeqPairAttentionClassifier,
     SeqPairFancyClassifier,
     DecAttClassifiter,
+    DecAttClassifiter_v2,
     ConvAttClassifier
 )
 from ..utils import abs_max_pooling
@@ -74,6 +75,19 @@ def make_DecAttClassifier(num_classes=None, task=None, device=None):
                              mask_special_tokens=True,
                              device=device)
 
+def make_DecAttClassifier_v2(num_classes=None, task=None, device=None):
+    assert task is not None
+    assert device is not None
+    assert num_classes is not None
+    return DecAttClassifiter_v2(768,
+                                num_classes,
+                                num_heads=4,
+                                dropout=0.3,
+                                task=task,
+                                pool_func=abs_max_pooling,
+                                mask_special_tokens=True,
+                                device=device)
+
 
 def make_ConvAttClassifier(num_classes=None, task=None, device=None):
     assert task is not None
@@ -96,5 +110,6 @@ classifiers_dict = {
     'SeqPairAttentionClassifier': make_SeqPairAttentionClassifier,
     'SeqPairFancyClassifier': make_SeqPairFancyClassifier,
     'DecAttClassifier': make_DecAttClassifier,
+    'DecAttClassifier-v2': make_DecAttClassifier_v2,
     'ConvAttClassifier': make_ConvAttClassifier,
 }

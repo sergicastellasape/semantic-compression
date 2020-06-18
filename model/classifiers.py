@@ -310,6 +310,86 @@ class DecAttClassifiter(nn.Module):
         return class_log_score
 
 
+class DecAttClassifiter_v2(nn.Module):
+    """
+    Seq pair classifier based on: "A Decomposable Attention Model for Natural Language Inference"
+    It's basically attention between the two sentences, aggregation and classification.
+    https://arxiv.org/pdf/1606.01933.pdf
+    """
+    def __init__(self,
+                 embedding_dim,
+                 num_classes,
+                 num_heads=4,
+                 dropout=0.3,
+                 task=None,
+                 pool_func=abs_max_pooling,
+                 mask_special_tokens=True,
+                 device=torch.device('cpu')):
+        super().__init__()
+        assert task is not None
+        self.task = task
+        self.mask_special_tokens = mask_special_tokens
+        self.device = device
+        self.pool_func = pool_func
+
+        # Define 1 -> 2 attention layer
+        self.att12 = nn.MultiHeadAttention(embedding_dim,
+                                           num_heads,
+                                           dropout=dropout,
+                                           bias=True,
+                                           add_bias_kv=False,
+                                           add_zero_attn=False,
+                                           kdim=None,
+                                           vdim=None).to(device)
+        self.att21 = nn.MultiHeadAttention(embedding_dim,
+                                           num_heads,
+                                           dropout=dropout,
+                                           bias=True,
+                                           add_bias_kv=False,
+                                           add_zero_attn=False,
+                                           kdim=None,
+                                           vdim=None).to(device)
+        self.classifier = nn.Linear(embedding_dim * 2, num_classes).to(device)
+
+        # Cross entropy loss function that's fed with the log_scores (numerical stability)
+        self.loss_fn = nn.NLLLoss(reduction="mean")
+
+    def loss(self, prediction, target):
+        return self.loss_fn(prediction, target)
+
+    def forward(self, inp, masks_dict=None, **kwargs):
+        assert masks_dict is not None
+
+        mask_2 = (masks_dict['seq_pair_mask'] == 1)
+        mask_1 = (masks_dict['seq_pair_mask'] == 0)
+        if self.mask_special_tokens:  # remove cls and sep tokens basically
+            mask_2 *= (masks_dict['regular_tokens_mask'] == 1)
+            mask_1 *= (masks_dict['regular_tokens_mask'] == 1)
+
+        inp_tensor1 = inp * mask_1.unsqueeze(-1)
+        inp_tensor2 = inp * mask_2.unsqueeze(-1)
+
+        # transpose so batch is second instead of first
+        att_seq1 = self.att12(inp_tensor1.transpose(0, 1),
+                              inp_tensor2.transpose(0, 1),
+                              inp_tensor2.transpose(0, 1),
+                              key_padding_mask=mask_2).transpose(0, 1)
+        att_seq2 = self.att21(inp_tensor2.transpose(0, 1),
+                              inp_tensor1.transpose(0, 1),
+                              inp_tensor1.transpose(0, 1),
+                              key_padding_mask=mask_1).transpose(0, 1)
+
+        # Watch out! if you do mean pooling, the padding might give problems!
+        aggregation_seq1 = self.pool_func(att_seq1, dim=1)
+        aggregation_seq2 = self.pool_func(att_seq2, dim=1)
+
+        classifier_features = torch.cat([aggregation_seq1, aggregation_seq2], dim=1)
+        class_score = self.classifier(classifier_features)
+        class_log_score = F.log_softmax(class_score, dim=1)
+
+        return class_log_score
+
+
 class SeqPairAttentionClassifier(nn.Module):
     def __init__(self,
                  embedding_dim,
