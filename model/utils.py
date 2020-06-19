@@ -192,7 +192,7 @@ def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
     return (T * weights).sum(dim=dim, keepdim=keepdim)
 
 def rnd_pooling(T, dim=-1, keepdim=False, **kwargs):
-    idx = torch.randint(T.size(dim), (1,))
+    idx = torch.randint(T.size(dim), (1,), device=T.device)
     if keepdim:
         return T.index_select(dim, idx)
     else:
