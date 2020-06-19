@@ -191,6 +191,13 @@ def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
     weights /= weights.norm(p=1, dim=dim)  # normalize so they add up to 1
     return (T * weights).sum(dim=dim, keepdim=keepdim)
 
+def rnd_pooling(T, dim=-1, keepdim=False, **kwargs):
+    idx = torch.randint(T.size(dim), (1,))
+    if keepdim:
+        return T.index_select(dim, idx)
+    else:
+        return T.index_select(dim, idx).squeeze(dim)
+
 def log_zipf_law(inp, alpha=1., log_ct=-1.0, rank_first=1996):
     # Log_ct is the term reflecting the probability of the element of rank = 1
     # log p("the") = log 0.02 = -2.7, for reference
