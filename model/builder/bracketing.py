@@ -5,6 +5,7 @@ from ..bracketing import (
     HardSpanChunker,
     FixedOutChunker,
     FreqChunker,
+    RndSpanChunker,
     IdentityChunker,
     cos
 )
@@ -31,7 +32,7 @@ def make_bracketer(args, device=None):
                                                         device=device)
     elif args.chunker == 'hard':
         logging.info("BRACKETER: Hard Span")
-        assert args.span != 0, "Provide a valid span!"
+        assert args.span is not None, "Provide a valid span!"
         bracketing_net = HardSpanChunker(span=args.span,
                                          device=device)
     elif args.chunker == 'fixed':
@@ -45,6 +46,11 @@ def make_bracketer(args, device=None):
         bracketing_net = FreqChunker(alpha=1.0,
                                      log_threshold=args.log_threshold,
                                      device=device)
+    elif args.chunker == 'rand':
+        logging.info("BRACKETER: Random span bracketer")
+        assert args.span is not None, "Provide a valid base span!"
+        bracketing_net = RndSpanChunker(span=args.span,
+                                        device=device)
     elif args.chunker is None:
         logging.info("BRACKETER: NO bracketer being used")
         bracketing_net = IdentityChunker()

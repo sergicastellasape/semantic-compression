@@ -74,7 +74,7 @@ parser.add_argument(
     type=str,
     required=False,
     default=None,
-    choices=["NNSimilarity", "agglomerative", "hard", "fixed", "freq"],
+    choices=["NNSimilarity", "agglomerative", "hard", "fixed", "freq", "rand"],
     help="Specify the chunker part of the net",
 )
 parser.add_argument(

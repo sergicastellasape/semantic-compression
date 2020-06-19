@@ -98,7 +98,7 @@ class BiLSTMClassifier(nn.Module):
         if self.pooling == "max_pooling":
             sent_space = self.hidden2sent(abs_max_pooling(unpacked_output, dim=1))
         elif self.pooling == "mean_pooling":
-            sent_space = self.hidden2sent(unpacked_output.mean(dim=1))
+            sent_space = self.hidden2sent(unpacked_output.mean(dim=1)) # need to correct for padding!
         else:
             right2left = unpacked_output[:, 1, :]
             bool_mask = F.one_hot(lengths - 2, num_classes=lengths.max()).unsqueeze(-1)
