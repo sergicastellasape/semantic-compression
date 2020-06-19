@@ -131,7 +131,6 @@ class ParamEmbeddingGenerator(nn.Module):
         mask_seq_pair = torch.zeros(
             (batch_size, max_len), dtype=torch.int8, device=self.device
         )
-
         for b, chunk_indices in enumerate(indices_batch):
             for i, idx_tuple in enumerate(chunk_indices):
                 # Forward pass on Generator Net for group of tensors
