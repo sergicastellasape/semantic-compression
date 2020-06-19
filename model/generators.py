@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from model.utils import abs_max_pooling
 from model.customlayers import Attention
+from model.utils import hotfix_pack_padded_sequence
 
 
 class EmbeddingGenerator(nn.Module):
@@ -130,7 +131,6 @@ class ParamEmbeddingGenerator(nn.Module):
         mask_seq_pair = torch.zeros(
             (batch_size, max_len), dtype=torch.int8, device=self.device
         )
-
         for b, chunk_indices in enumerate(indices_batch):
             for i, idx_tuple in enumerate(chunk_indices):
                 # Forward pass on Generator Net for group of tensors
@@ -214,6 +214,57 @@ class ConvAtt(nn.Module):
         output, _ = self.attend(query, mix, context_mask=mask)
         return output
 
+
+class LSTM(nn.Module):
+    def __init__(self, embedding_dim, hidden_dim=768, num_layers=1, dropout=0.0, device=torch.device('cpu'), **kwargs):
+        super().__init__()
+        self.device = device
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
+        self.directions = 1
+        self.lstm = nn.LSTM(
+            embedding_dim,
+            hidden_dim,
+            bidirectional=False,
+            num_layers=num_layers,
+            dropout=dropout,
+            batch_first=True,
+            bias=True,
+        )
+
+    def init_hidden(self, batch_size):
+        # As of the documentation from nn.LSTM in pytorch, the input to the lstm cell is
+        # the input and a tuple of (h, c) hidden state and memory state. We initialize that
+        # tuple with the proper shape: num_layers*directions, batch_size, hidden_dim. Don't worry
+        # that the batch here is second, this is dealt with internally if the lstm is created with
+        # batch_first=True
+        shape = (self.num_layers * self.directions, batch_size, self.hidden_dim)
+        return (
+            torch.zeros(shape, requires_grad=True, device=self.device),
+            torch.zeros(shape, requires_grad=True, device=self.device),
+        )
+
+    def forward(self, inp, mask=None, **kwargs):
+        if mask is None:
+            mask = torch.ones((inp.size(0), inp.size(1)),
+                              dtype=torch.int8,
+                              device=inp.device,
+                              requires_grad=False)
+        # Calculate original lengths
+        lengths = mask.sum(dim=1)
+        packed_tensors = hotfix_pack_padded_sequence(
+            inp, lengths, enforce_sorted=False, batch_first=True
+        )
+        # detach to make the computation graph for the backward pass only for 1 sequence
+        hidden, cell = self.init_hidden(inp.size(0))  # feed with batch_size
+        lstm_out, (hidden_out, cell_out) = self.lstm(packed_tensors,
+                                                     (hidden, cell))
+
+        # we unpack and use the last lstm output for classification
+        unpacked_output = torch.nn.utils.rnn.pad_packed_sequence(
+            lstm_out, batch_first=True
+        )[0]
+        return unpacked_output.mean(dim=1)
 
 class IdentityGenerator(nn.Module):
     def __init__(self, device=torch.device('cpu'), *args, **kwargs):
