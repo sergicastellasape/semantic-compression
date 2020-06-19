@@ -2,6 +2,7 @@ from ..generators import (
     EmbeddingGenerator,
     ParamEmbeddingGenerator,
     ConvAtt,
+    LSTM,
     IdentityGenerator
 )
 from ..utils import abs_max_pooling, mean_pooling, freq_pooling
@@ -16,7 +17,8 @@ def make_generator(args, device=None):
         'freq_pooling': freq_pooling
     }
     pooling_nn = {
-        'conv_att': ConvAtt
+        'conv_att': ConvAtt,
+        'lstm': LSTM,
     }
     if args.pooling is None:
         return IdentityGenerator(device=device)
