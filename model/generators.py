@@ -217,7 +217,7 @@ class ConvAtt(nn.Module):
 
 
 class LSTM(nn.Module):
-    def __init__(self, embedding_dim, hidden_dim=768, num_layers=1, dropout=0.3, device=torch.device('cpu'), **kwargs):
+    def __init__(self, embedding_dim, hidden_dim=768, num_layers=1, dropout=0.0, device=torch.device('cpu'), **kwargs):
         super().__init__()
         self.device = device
         self.num_layers = num_layers
