@@ -11,5 +11,6 @@ def make_transformer(args, device=None):
                                   tokenizer_class=BertTokenizer,
                                   pre_trained_weights="bert-base-uncased",
                                   output_layer=args.trf_out_layer,
+                                  agg_layer=args.agg_layer,
                                   device=device)
     return transformer_net
