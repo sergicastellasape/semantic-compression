@@ -74,6 +74,9 @@ if args.eval_comp:
     assert args.pooling is not None
     assert args.chunker is not None
 
+if args.agg_layer is None:
+    args.agg_layer = args.trf_out_layer
+
 if args.write_google_sheet:
     assert int(args.run_id[-1]), "Run identifier must end with version number from 0 to 9!"
 

@@ -33,6 +33,15 @@ parser.add_argument(
     help="Distance threshold used for agglomerative chunking in the embedding space.",
 )
 parser.add_argument(
+    "--agg-layer",
+    "-agglayer",
+    dest="agg_layer",
+    type=int,
+    default=None,
+    required=False,
+    help="Layer of features to use for the agglomerative. If empty, the same trf-out-layer is used.",
+)
+parser.add_argument(
     "--log-threshold",
     "-logthr",
     dest="log_threshold",

@@ -12,6 +12,7 @@ class Transformer(nn.Module):
         tokenizer_class=BertTokenizer,
         pre_trained_weights="bert-base-uncased",
         output_layer=-1,
+        agg_layer=None,
         device=torch.device("cpu"),
     ):
         super(Transformer, self).__init__()
@@ -22,6 +23,7 @@ class Transformer(nn.Module):
         self.model.to(device)
         self.tokenizer = tokenizer_class.from_pretrained(pre_trained_weights)
         self.output_layer = output_layer
+        self.agg_layer = agg_layer if agg_layer is not None else output_layer
 
     def forward(self, batch_sequences, return_extras=False, max_length=256):
         # return_extras: add returning the masks_dict and the token_ids
@@ -29,9 +31,8 @@ class Transformer(nn.Module):
         hidden_states_tup = self.model(
             batch_input_ids, attention_mask=masks_dict["padding_mask"]
         )[-1]
-
         if return_extras:
-            return hidden_states_tup[self.output_layer], masks_dict, batch_input_ids
+            return hidden_states_tup[self.output_layer], masks_dict, batch_input_ids, hidden_states_tup[self.agg_layer]
         else:
             return hidden_states_tup[self.output_layer]
 
