@@ -190,6 +190,7 @@ class ConvAtt(nn.Module):
         self.conv1D = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=5, padding=2)  # padding=(kernel-1)/2
         self.skip_weight = nn.Parameter(torch.tensor(0.1, requires_grad=True))
         self.attend = Attention(embedding_dim, attention_type="general", device=device)
+        self.linear = nn.Linear(embedding_dim, embedding_dim)
 
         # Initialize the attention vec for the generation of compressed rep
         init_normal = torch.empty(1, 1, embedding_dim).normal_(
@@ -212,7 +213,8 @@ class ConvAtt(nn.Module):
         conv_out = self.conv1D(inp.transpose(1, 2)).transpose(1, 2) * mask
         mix = (1 - self.skip_weight) * inp + self.skip_weight * conv_out
         output, _ = self.attend(query, mix, context_mask=mask)
-        return output
+
+        return self.linear(output)
 
 
 class LSTM(nn.Module):
