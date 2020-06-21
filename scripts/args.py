@@ -167,6 +167,15 @@ parser.add_argument(
     help="Walltime for training",
 )
 parser.add_argument(
+    "--wall-steps",
+    "-ws",
+    dest="wallsteps",
+    required=False,
+    type=int,
+    default=500000,
+    help="Wall steps for training",
+)
+parser.add_argument(
     "--train-compression",
     "-tc",
     required=False,

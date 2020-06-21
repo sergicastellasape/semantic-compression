@@ -273,12 +273,12 @@ while not finished_training:
         writer.add_scalars(f"metrics/dev/{args.run_id}",
                            metrics_dict, global_step=global_counter)
 
-    global_counter += 1
     first_iteration = False
     # Update the saved global_counter in tensorboard directory
     torch.save(global_counter, counter_path)
-    finished_training = True if (
-        time.time() - initial_time) > args.walltime else False
+    finished_training = True if (time.time() - initial_time) > args.walltime or \
+        global_counter >= args.wallsteps else False
+    global_counter += 1
 
 if args.full_test_eval:
     logging.info("########## FINAL EVAL ON FULL TEST SET #############")
