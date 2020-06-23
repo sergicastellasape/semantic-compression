@@ -21,12 +21,29 @@ def eval_model_on_DF(
     dataframes_dict,
     get_batch_function_dict,
     batch_size=16,
-    global_counter=0,
     compression=None,
     return_comp_rate=False,
     max_length=256,
     device=torch.device("cpu"),
 ):
+    """Evaluates a model on a dataframe.
+    Args:
+        model: full model to evaluate (nn.Module)
+        dataframes_dic: dictionary of dataframes, keys are the dataset names
+        get_batch_function_dict: dictionary of functions to load batches
+        batch_size: size of the batch to run samples. Higher batch sizes
+            improve speed, but a too high size could cause a memory error.
+        compression: compress sequence in forward pass.
+        return_comp_rate: flag to return a dictionary of average compression
+            rates for each dataset.
+        max_length: maximum length to truncate sequences (it can prevent
+            memory errors if a sequence in a dataset is very long).
+        device: torch.device in use, cpu or cuda.
+    Returns:
+        metrics_dict: dictionary of metrics with dataset names as keys.
+        compression_dict: if return_comp_rate=True, it returns compression
+            rates as a dictionary with dataset names as keys.
+    """
 
     assert compression is not None
     metrics_dict, compression_dict = {}, {}
@@ -76,6 +93,9 @@ def eval_model_on_DF(
         return metrics_dict
 
 def write_google_sheet(results_dict, row=2, name='results_layers', sheet_name='run1'):
+    """Writes a dictionary of results in a Googls Spreadsheet. This function is
+    mostly for a one-time use, so it's not very reusable.
+    """
     # Google API stuff
     scope = ["https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name('config/gcp-credentials.json', scope)
@@ -83,53 +103,71 @@ def write_google_sheet(results_dict, row=2, name='results_layers', sheet_name='r
     sheet = client.open(name).worksheet(sheet_name)
     sheet.update(f'B{row}:D{row}', [list(results_dict.values())])
 
-
 def make_connectivity_matrix(length, span=1):
-    span = min(length - 1, span)
-    col, row = [], []
-    for d in range(span):
-        y = list(range(0, length - (d + 1)))
-        x = list(range(d + 1, length))
-        col.extend(x)
-        col.extend(y)
-        row.extend(y)
-        row.extend(x)
-    # Precomput the number of 1s in the sparse mtrx
-    N_ones = 2 * (span * length - sum(range(span + 1)))
-    data = np.ones(N_ones, dtype=int)
-    connectivity_matrix = scipy.sparse.coo_matrix(
-        (data, (row, col)), shape=(length, length)
-    ).toarray()
-    return connectivity_matrix
+    """Returns a (length x length) connectixity matrix of 1s in a 'thick'
+    diagonal and 0s on the rest, which can be fed into the agglomerative
+    clustering function, such that only datapoints that are connected can be
+    merged into the same cluster.
+    Sleek line of code originally written by Boris Reuderink.
+    Args:
+        length: size of the matrix
+        span: number of elements above and below the diagonal that will be 1s.
+            if span=1, only one row above and below the diagonal will be 1s,
+            with span >= 1. If span=2 two layers above and below the diagonal
+            will be 1s and so on. The 'thickness' of 1s in the diagonal is
+            2 * span + 1.
+    Returns:
+        connectivity_matrix: np.array of length x length with 1s in a 'thick'
+            diagonal and 0s in the rest.
+
+    """
+    return np.fromfunction(lambda i, j: abs(i - j) <= span, (length, length))
 
 
 def compression2euclideandist(compression):
-    distance_threshold = None
-    return distance_threshold
+    raise NotImplementedError()
 
 
 def add_space_to_special_characters(string, characters=[]):
+    """Little function that adds a space to the left and right of a list of
+    'special characters' provided. This is only used for the deprecated
+    spacey_based_bracketing function.
+    Args:
+        string: original string to apply the transformation to.
+        characters: list of characters you want to add spaces to.
+    Returns:
+        string: modified string with spaces around the characters.
+    """
     for char in characters:
         string = string.replace(char, f" {char} ")
     return string
 
 
 def filter_indices(indices_batch):
-    """
-    Removes the lists of lengths 1 in a list of lists.
+    """Removes the lists of lengths 1 in a list of lists. Not used anymore.
+    Args:
+        indices_batch: list of lists
+    Returns
+        indices_batch: list of lists where inner lists of length=1 have been
+            removed.
     """
     for b, indices in enumerate(indices_batch):
         for i, idx in enumerate(indices):
             if len(idx) == 1:
                 indices_batch[b].pop(i)
-
     return indices_batch
 
 
 def expand_indices(indices_batch, target_lengths):
-    """
-    Adds a leading indices in tuples (i.e. (0,)) to the list of indices if it's
-    missing and the same for the last indices
+    """Adds a leading indices in tuples (i.e. (0,)) to the list of indices if
+    it's missing and the same for the last indices. Only used for the unused
+    spacy_based_bracketing.
+    Args:
+        indices_batch: list of lists of indices
+        target_lengths: desired length of inner lists
+    Returns:
+        indices_batch: modified indices_batch where inner lists are all the same
+            target lengths.
     """
 
     assert len(indices_batch) == len(target_lengths)
@@ -149,12 +187,17 @@ def expand_indices(indices_batch, target_lengths):
 
 
 def time_since(t, message):
+    """Prints a message and the time it has passed since time t next to it"""
     print(message, time.time() - t)
 
 
 def txt2list(txt_path=None):
-    """
-    Load txt file and split the sentences into a list of strings
+    """Load txt file and split the sentences into a list of strings, splitted
+    by a regex expression.
+    Args:
+        txt_path: path to the .txt file to convert to list of strings.
+    Returns:
+        sentences: list of sentences from the .txt file.
     """
     if txt_path is None:
         raise ValueError(
@@ -175,6 +218,17 @@ def txt2list(txt_path=None):
 
 
 def abs_max_pooling(T, dim=-1, keepdim=False, **kwargs):
+    """Performs the absolute max pooling operation along a dimension, similarly
+    to how torch.mean() or torch.max() would.
+    Args:
+        T: tensor to apply the operation to.
+        dim: dimension along the operation is performed.
+        keepdim: Flag which if `True`, keeps the dimensions of the original tensor
+            by returning an 'unsqueezed' tensor at dimension `dim`.
+    Returns:
+        torch.tensor: tensor formed by the maximum absolute values along
+            dimension `dim`.
+    """
     # Reduce with absolute max pooling over the specified dimension
     abs_max, _ = torch.max(T.abs(), dim=dim, keepdim=True)
     bool_mask = T.abs() >= abs_max
@@ -182,9 +236,34 @@ def abs_max_pooling(T, dim=-1, keepdim=False, **kwargs):
 
 
 def mean_pooling(T, dim=-1, keepdim=False, **kwargs):
+    """Performs the mean pooling operation, exactly as torch.mean() does. This
+    function exists for consistency between different pooling operations.
+    Args:
+        T: tensor to apply the operation to.
+        dim: dimension along the operation is performed.
+        keepdim: Flag which if `True`, keeps the dimensions of the original tensor
+            by returning an 'unsqueezed' tensor at dimension `dim`.
+    Returns:
+        torch.tensor: tensor formed by the mean values along dimension `dim`.
+    """
     return T.mean(dim=dim, keepdim=keepdim)
 
 def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
+    """Performs a pooling operation based on frequencies of elements along a
+    dimension following a weighting according to `a / (p(i) + a)`, where p(i) is
+    the probability of element `i` (or its inverse frequency) and `a` is a constant.
+     It is inspired by Arora et. al 2017
+    https://openreview.net/pdf?id=SyK00v5xx It uses the Zipf law to estimate
+    element frequencies based on their rank.
+    Args:
+        T: tensor to apply the operation to.
+        dim: dimension along the operation is performed.
+        keepdim: Flag which if `True`, keeps the dimensions of the original tensor
+            by returning an 'unsqueezed' tensor at dimension `dim`.
+    Returns:
+        torch.tensor: pooled tensor along dimension `dim` with a noramlized
+            weighted sum.
+    """
     a = 1e-4
     log_p = log_zipf_law(token_ids.unsqueeze(-1))
     weights = a / (torch.exp(log_p) + a)  # Strategy from Arora et al 2018.
@@ -192,6 +271,16 @@ def freq_pooling(T, dim=-1, keepdim=False, token_ids=None, **kawrgs):
     return (T * weights).sum(dim=dim, keepdim=keepdim)
 
 def rnd_pooling(T, dim=-1, keepdim=False, **kwargs):
+    """Performs a pooling operation along dimension `dim` by selecting a random
+    index from a uniform distribution along the pooling dimension.
+    Args:
+        T: tensor to apply the operation to.
+        dim: dimension along the operation is performed.
+        keepdim: Flag which if `True`, keeps the dimensions of the original tensor
+            by returning an 'unsqueezed' tensor at dimension `dim`.
+    Returns:
+        torch.tensor: randomly pooled tensor along dimension `dim`.
+    """
     idx = torch.randint(T.size(dim), (1,), device=T.device)
     if keepdim:
         return T.index_select(dim, idx)
@@ -199,6 +288,24 @@ def rnd_pooling(T, dim=-1, keepdim=False, **kwargs):
         return T.index_select(dim, idx).squeeze(dim)
 
 def log_zipf_law(inp, alpha=1., log_ct=-1.0, rank_first=1996):
+    """Calculates the log Zipf law of a tensor of ranks, returning the estimated
+    log probability for each one of them. The Zipf law is an empirical
+    'heavy tail' distribution that determines the frequencies of items given the
+    ranking of their frequencies. Frequencies of words in languages can
+    generally be approximated by this law: https://www.aclweb.org/anthology/W98-1218.pdf
+    Args:
+        inp: torch.tensor of any size with ranks (i.e. natural numbers)
+        apha: parameter for the Zipf law, it's normally close to 1 in English.
+        log_ct: parameter for the Zipf law determining the log probability of
+            the most frequent word. We set it to -1.
+        rank_first: rank of the most probable element (i.e. when you should
+        start counting, if the rank numbers don't start at 1). It is set to
+        1996 because the Bert Tokenizer starts with the english vocabulary at
+        that id.
+    Returns:
+        torch.tensor: torch.tensor of the same size as the input with log
+            probabities for each element.
+    """
     # Log_ct is the term reflecting the probability of the element of rank = 1
     # log p("the") = log 0.02 = -2.7, for reference
     ranks = (inp - rank_first) * (inp > rank_first) + 1.
@@ -210,6 +317,13 @@ def hotfix_pack_padded_sequence(inp,
                                 lengths,
                                 batch_first=False,
                                 enforce_sorted=True):
+    """Quick fix for the pytorch pack_padded_sequence function, which had a bug
+    related to failing to use cuda properly. The behavior is supposed to emulate
+    that of torch.nn.utils.rnn.pack_padded_sequence(); find the documentation in
+    https://pytorch.org/docs/master/generated/torch.nn.utils.rnn.pack_padded_sequence.html
+
+    Code authored by @ptrblck and shared in the open forum https://discuss.pytorch.org
+    """
     lengths = torch.as_tensor(lengths, dtype=torch.int64)
     lengths = lengths.cpu()
     if enforce_sorted:
@@ -227,9 +341,13 @@ def hotfix_pack_padded_sequence(inp,
 
 
 def str2bool(v):
-    """
-    To pass True or False boolean arguments
-    in argparse. Code from stackoverflow.
+    """Converts a string into a boolean variable. Used to pass boolean arguments
+    in the command line arguments instead of using flags. Inspired from a
+    StackOverflow respone from
+    Args:
+        v: string
+    Returns:
+        bool: boolean value from parsing the string.
     """
     if isinstance(v, bool):
         return v
