@@ -8,6 +8,9 @@ from ..generators import (
 from ..utils import abs_max_pooling, mean_pooling, freq_pooling, rnd_pooling
 
 def make_generator(args, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert device is not None
 
     embedding_dim = 768  # hardcoded for now

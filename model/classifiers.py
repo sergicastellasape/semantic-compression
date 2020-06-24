@@ -10,11 +10,30 @@ from model.customlayers import Attention
 
 
 class BiLSTMClassifier(nn.Module):
+    """Sequence classifier based on a BiLSTM architecture.
+    Args:
+        embedding_dim: size of the feature vectors (768 for BERT-base).
+        hidden_dim: size of the hidden dimension of the network.
+        num_classes: number of classes for the classifier.
+        num_layers: number of stacked layers of LSTMS.
+        pooling: strategy for pooling over hidden states to obtain a single
+            feature vector to classify.
+        task: name of the task (string) to save as an attribute to the object.
+        bidirectional: boolean which if True, implements bidirectional LSTM,
+            and if False, falls back to a traditional left-to-right.
+        mask_special_tokens: boolean which if True masks not only padding but
+            also special tokens such as <cls> and <sep> from the transformer
+            encoder.
+        dropout: ratio of dropout for inner layers during training; helps in
+            preventing overfitting. As a rule of thumb, 0.3 is a good ratio to
+            begin with.
+        device: `torch.device` to use, for cpu or cuda.
+    """
     def __init__(
         self,
         embedding_dim,
         hidden_dim,
-        sentset_size,
+        num_classes,
         num_layers,
         pooling=None,
         task=None,
@@ -31,10 +50,11 @@ class BiLSTMClassifier(nn.Module):
         self.num_layers = num_layers
         self.pooling = pooling
         self.mask_special_tokens = mask_special_tokens
-        if bidirectional:
-            self.directions = 2
-        else:
-            self.directions = 1
+        self.directions = 2 if bidirectional else 1
+        if pooling not in ['mean_pooling', 'abs_max_pooling']:
+            raise Warning("Concatenation Pooling for BiLSTM Classifier is not \
+                tested, and only implemented for bidirectional LSTM. \
+                Please Debug before using!")
 
         # The LSTM takes word embeddings as inputs, and outputs hidden states
         # with dimensionality hidden_dim.
@@ -52,11 +72,10 @@ class BiLSTMClassifier(nn.Module):
         # self.attend = nlpnn.Attention(embedding_dim, attention_type='dot')
 
         # The linear layer that maps from hidden state space to sentiment classification space
-        self.hidden2sent = nn.Linear(hidden_dim * self.directions, sentset_size)
+        self.hidden2sent = nn.Linear(hidden_dim * self.directions, num_classes)
         self.loss_fn = nn.NLLLoss(reduction="mean")
 
     def init_hidden(self, batch_size):
-
         # As of the documentation from nn.LSTM in pytorch, the input to the lstm cell is
         # the input and a tuple of (h, c) hidden state and memory state. We initialize that
         # tuple with the proper shape: num_layers*directions, batch_size, hidden_dim. Don't worry
@@ -69,9 +88,27 @@ class BiLSTMClassifier(nn.Module):
         )
 
     def loss(self, predicted, target):
+        """Calls the loss function defined in __init__(), which is a
+        Negative Log Likelihood Loss, equivalend to a cross entorpy loss, but
+        a previous log softmax activation. See PyTorch documentation for further
+        details.
+        """
         return self.loss_fn(predicted, target)
 
     def forward(self, inp, masks_dict=None, **kwargs):
+        """Performs forward pass of the BiLSTM for a batch.
+        Args:
+            inp: `torch.tensor` of size (batch, max_length, embedding_dim),
+                which is padded to the right to the sequence of maximum length.
+            masks_dict: dictionary of masks (`torch.tensor` of uint8) for the
+                output with keys `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+            **kwargs: just as a safeguard if a generic network call to trigger
+                this method, which uses other keyword arguments.
+        Returns:
+            log_scores: `torch.tensor` of size (batch, num_classes) with each
+                class' log score, to be later fed into a NLL loss.
+        """
         assert masks_dict is not None
 
         if self.mask_special_tokens:
@@ -95,7 +132,7 @@ class BiLSTMClassifier(nn.Module):
         #print(lengths - 1)
         #print(unpacked_output[:, lengths - 2, :].size())
         # max pooling input needs to be (batch, seq_lengh, embedding)
-        if self.pooling == "max_pooling":
+        if self.pooling == "abs_max_pooling":
             sent_space = self.hidden2sent(abs_max_pooling(unpacked_output, dim=1))
         elif self.pooling == "mean_pooling":
             sent_space = self.hidden2sent(unpacked_output.mean(dim=1)) # need to correct for padding!
@@ -103,21 +140,18 @@ class BiLSTMClassifier(nn.Module):
             right2left = unpacked_output[:, 1, :]
             bool_mask = F.one_hot(lengths - 2, num_classes=lengths.max()).unsqueeze(-1)
             left2right = (unpacked_output * bool_mask).sum(dim=1)
-            # This should be replaced by a concatenation and a different size linear
-            # layer, but I'm not gonna use it for now, so combining the features for now
-            # will do the job
-            sent_space = self.hidden2sent(right2left + left2right)
+            sent_space = self.hidden2sent(torch.cat([right2left, left2right], dim=1))
 
-        sent_scores = F.log_softmax(sent_space, dim=1)
+        log_scores = F.log_softmax(sent_space, dim=1)
 
-        return sent_scores
+        return log_scores
 
 
 class AttentionClassifier(nn.Module):
     def __init__(
         self,
         embedding_dim,
-        sentset_size,
+        num_classes,
         dropout=0.0,
         n_sentiments=2,
         task=None,
@@ -137,9 +171,9 @@ class AttentionClassifier(nn.Module):
 
         # The linear layer that maps from embedding state space to sentiment classification space
         if self.pool_mode == "concat":
-            self.classifier = nn.Linear(embedding_dim * n_sentiments, sentset_size).to(device)
+            self.classifier = nn.Linear(embedding_dim * n_sentiments, num_classes).to(device)
         else:
-            self.classifier = nn.Linear(embedding_dim, sentset_size).to(device)
+            self.classifier = nn.Linear(embedding_dim, num_classes).to(device)
 
         # Loss function as negative log likelihood, which needs a logsoftmax input
         self.loss_fn = nn.NLLLoss(reduction="mean")
@@ -249,6 +283,18 @@ class DecAttClassifiter(nn.Module):
     Seq pair classifier based on: "A Decomposable Attention Model for Natural Language Inference"
     It's basically attention between the two sentences, aggregation and classification.
     https://arxiv.org/pdf/1606.01933.pdf
+    Args:
+        embedding_dim: size of the feature vectors (768 for BERT-base).
+        num_classes: number of classes for the classifier.
+        pool_func: *function object* for pooling over hidden states to obtain a
+            single feature vector to classify.
+        task: name of the task (string) to save as an attribute to the object.
+        bidirectional: boolean which if True, implements bidirectional LSTM,
+            and if False, falls back to a traditional left-to-right.
+        mask_special_tokens: boolean which if True masks not only padding but
+            also special tokens such as <cls> and <sep> from the transformer
+            encoder.
+        device: `torch.device` to use, for cpu or cuda.
     """
     def __init__(self,
                  embedding_dim,
@@ -274,9 +320,27 @@ class DecAttClassifiter(nn.Module):
         self.loss_fn = nn.NLLLoss(reduction="mean")
 
     def loss(self, prediction, target):
+        """Calls the loss function defined in __init__(), which is a
+        Negative Log Likelihood Loss, equivalend to a cross entorpy loss, but
+        a previous log softmax activation. See PyTorch documentation for further
+        details.
+        """
         return self.loss_fn(prediction, target)
 
     def forward(self, inp, masks_dict=None, **kwargs):
+        """Performs forward pass of the DecAttClassifier for a batch.
+        Args:
+            inp: `torch.tensor` of size (batch, max_length, embedding_dim),
+                which is padded to the right to the sequence of maximum length.
+            masks_dict: dictionary of masks (`torch.tensor` of uint8) for the
+                output with keys `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+            **kwargs: just as a safeguard if a generic network call to trigger
+                this method, which uses other keyword arguments.
+        Returns:
+            log_scores: `torch.tensor` of size (batch, num_classes) with each
+                class' log score, to be later fed into a NLL loss.
+        """
         assert masks_dict is not None
 
         mask_2 = (masks_dict['seq_pair_mask'] == 1)
@@ -315,6 +379,9 @@ class DecAttClassifiter_v2(nn.Module):
     Seq pair classifier based on: "A Decomposable Attention Model for Natural Language Inference"
     It's basically attention between the two sentences, aggregation and classification.
     https://arxiv.org/pdf/1606.01933.pdf
+    The difference between v2 and original is that this implements pytorch's
+    generig multi-headed attention instead of single one. Results did not seem
+    to improve by this change, so we did not end up using it.
     """
     def __init__(self,
                  embedding_dim,
@@ -399,6 +466,8 @@ class SeqPairAttentionClassifier(nn.Module):
                  device=torch.device("cpu")):
         super(SeqPairAttentionClassifier, self).__init__()
         assert task is not None
+        raise Warning("This module could be not properly designed, contain bugs,\
+            so it should be used with caution!")
         self.task = task
         self.device = device
         self.pool_mode = pool_mode
@@ -511,6 +580,8 @@ class NaivePoolingClassifier(nn.Module):
 
 
 class SeqPairFancyClassifier(nn.Module):
+    """Network only used for toy experiments and testing. Do not use unless
+    """
     def __init__(
         self,
         embedding_dim,
@@ -522,7 +593,8 @@ class SeqPairFancyClassifier(nn.Module):
     ):
         super(SeqPairFancyClassifier, self).__init__()
         assert task is not None
-
+        raise Warning("This module could be not properly designed, contain bugs,\
+            so it should be used with caution!")
         self.task = task
         self.device = device
 

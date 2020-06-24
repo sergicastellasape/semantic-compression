@@ -6,6 +6,9 @@ from .classifiers import classifiers_dict
 from ..model import MultiTaskNet
 
 def make_multitask_net(args, dataset_config, model_config, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert device is not None
     network_list = []
     for dataset in args.datasets:

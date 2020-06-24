@@ -11,7 +11,9 @@ from ..bracketing import (
 )
 
 def make_bracketer(args, device=None):
-
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert device is not None
 
     if args.chunker == 'NNSimilarity':
