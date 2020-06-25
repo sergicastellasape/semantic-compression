@@ -13,9 +13,10 @@ cos = torch.nn.CosineSimilarity(dim=-1, eps=1e-5)  # default similarity func.
 
 
 class NNSimilarityChunker(nn.Module):
-    """
-    This class implements a model that performs "chunking" based on a similarity threshold,
-    as defined by a similarity function (cosine similarity by default).
+    """This class implements a model that performs "chunking" based on a
+    similarity threshold, as defined by a similarity function (cosine similarity
+    by default). It was deprecated because it is very slow, chunks can overlap
+    and it's overall a bad implementation.
     """
 
     def __init__(
@@ -121,12 +122,23 @@ class NNSimilarityChunker(nn.Module):
 
 
 class AgglomerativeClusteringChunker(nn.Module):
-    """
-    Wrapper that implements sklearn.cluster.MeanShift for a batch of tensors.
-    This turned into a nightmare after realizing that the agglomerative
-    clustering from sklearn can't take a non-fully connected connectivity
-    matrix. So the code is UGLY... but I needed to implement somehow the option to
-    remove the special tokens and also prevent merging seq pairs...
+    """Wrapper that implements sklearn.cluster.AgglomerativeClustering for a batch
+    of tensors.
+    Args:
+        threshold: distance threshold above which the clustering stops. If
+            normalize is True, typicallly ranges from 0.9 to 1.7
+        max_skip: maximum skipping of the sequentiality allowed by clustering,
+            for instance, if max_skip=1 only contiguous points can be assigned
+            the same cluster, whereas for max_skip=3 we allow a 'jump' of over
+            2 datapoints.
+        normalize: boolean which if True, does an L2 normalization on the
+            embeddings before usin euclidean distance, such that it behaves
+            closer to cosine similarity and the distance threshold is more
+            predictable. Cosine similarity is not used as a distance metric
+            because it doesn't accept ward linkage which stabilizes the
+            clustering (with mean linkage, big clusters tend to swallow the
+            rest, resulting in very 'unstable' clustering)
+        device: `torch.device` to use, for cpu or cuda.
     """
     def __init__(self, threshold=0.9, max_skip=4, normalize=True, device=torch.device("cpu")):
         super().__init__()
@@ -139,6 +151,27 @@ class AgglomerativeClusteringChunker(nn.Module):
         self.id = nn.Identity()
 
     def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
+        """Given a batch of sequences, performs agglomerative clustering on them,
+        and returns a list of lists of tuples as indices for the embeddings that
+        should be compressed. It only clusters regular tokens, and if
+        mask_special_tokens is true, they remain in their own cluster. It is
+        implemented sequentially for each element in the batch because sklearn
+        implementation doesn't allow for parallelization and it would involve
+        technical overhead, but there is no reason why it could not be
+        parallelized.
+        Args:
+            inp: `torch.tensor` of size (batch, max_length, embedding_dim)
+            masks_dict: dictionary of masks (torch.tensor of uint8) for the
+                output with keys `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+            mask_special_tokens: boolean which if True, leaves out of clustering
+                special tokens (<cls>, <sep>) in addition to padding ones.
+            **kwargs: just as a safeguard if a generic network call to trigger
+                this method, which uses other keyword arguments.
+        Returns:
+            indices_to_compact: list of lists of tuples with the indices that
+                the generator needs to compress.
+        """
         assert masks_dict is not None
         if not mask_special_tokens:
             keep_mask = (masks_dict['padding_mask'] == 1).detach().cpu().numpy()
@@ -209,6 +242,13 @@ class AgglomerativeClusteringChunker(nn.Module):
 
 
 class HardSpanChunker(nn.Module):
+    """Class for the chunker that implements 'hard chunking', that is, segmenting
+    a sequence in chunks whose size is a fixed 'window' or 'span'.
+    Args:
+        span: size of the chunks, for instance, if span=3, datapoints will be
+            chunked as (1, 2, 3), (4, 5, 6), (7, 8, 9) etc.
+        device: `torch.device` to use, for cpu or cuda.
+    """
     def __init__(self, span=None, device=torch.device('cpu')):
         super().__init__()
         assert span is not None
@@ -217,6 +257,20 @@ class HardSpanChunker(nn.Module):
         self.span = span
 
     def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
+        """Performs the forward pass of hard chunking on a batch of tensors.
+        Args:
+            inp: `torch.tensor` of size (batch, max_length, embedding_dim)
+            masks_dict: dictionary of masks (torch.tensor of uint8) for the
+                output with keys `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+            mask_special_tokens: boolean which if True, leaves out of clustering
+                special tokens (<cls>, <sep>) in addition to padding ones.
+            **kwargs: just as a safeguard if a generic network call to trigger
+                this method, which uses other keyword arguments.
+        Returns:
+            indices_to_compact: list of lists of tuples with the indices that
+                the generator needs to compress.
+        """
         assert masks_dict is not None
         batch_size = inp.size(0)
         if not mask_special_tokens:
@@ -252,6 +306,15 @@ class HardSpanChunker(nn.Module):
 
 
 class RndSpanChunker(nn.Module):
+    """Variation of the hardspan chunker that randomizes the size of the chunks.
+    Given a base span, the size of each chunk will be drawn from a uniform
+    distribution of integers of U[1, 2 * span), such that the expected
+    compression will be the same, but the chunks will not be of uniform size.
+    Args:
+        span: size of the chunks, for instance, if span=3, datapoints will be
+            chunked as (1, 2, 3), (4, 5, 6), (7, 8, 9) etc.
+        device: `torch.device` to use, cpu or cuda.
+    """
     def __init__(self, span=None, device=torch.device('cpu')):
         super().__init__()
         assert span is not None
@@ -260,6 +323,20 @@ class RndSpanChunker(nn.Module):
         self.span = span
 
     def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
+        """Performs a forward pass of random chunking of a batch of tensors.
+        Args:
+            inp: `torch.tensor` of size (batch, max_length, embedding_dim)
+            masks_dict: dictionary of masks (torch.tensor of uint8) for the
+                output with keys `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+            mask_special_tokens: boolean which if True, leaves out of clustering
+                special tokens (<cls>, <sep>) in addition to padding ones.
+            **kwargs: just as a safeguard if a generic network call to trigger
+                this method, which uses other keyword arguments.
+        Returns:
+            indices_to_compact: list of lists of tuples with the indices that
+                the generator needs to compress.
+        """
         assert masks_dict is not None
         batch_size = inp.size(0)
         if not mask_special_tokens:
@@ -296,6 +373,12 @@ class RndSpanChunker(nn.Module):
 
 
 class FixedOutChunker(nn.Module):
+    """Class for the chunker that implements 'fixed chunking', that is,
+    segmenting in a predefined number of chunks, regardless of its length.
+    Args:
+        out_num: number of chunks to segment each sequence in.
+        device: `torch.device` to use, for cpu or cuda.
+    """
     def __init__(self, out_num=None, device=torch.device('cpu')):
         super().__init__()
         assert out_num is not None
@@ -304,6 +387,20 @@ class FixedOutChunker(nn.Module):
         self.out_num = out_num
 
     def forward(self, inp, masks_dict=None, mask_special_tokens=True, **kwargs):
+        """Performs a forward pass of random chunking of a batch of tensors.
+        Args:
+            inp: `torch.tensor` of size (batch, max_length, embedding_dim)
+            masks_dict: dictionary of masks (torch.tensor of uint8) for the
+                output with keys `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+            mask_special_tokens: boolean which if True, leaves out of clustering
+                special tokens (<cls>, <sep>) in addition to padding ones.
+            **kwargs: just as a safeguard if a generic network call to trigger
+                this method, which uses other keyword arguments.
+        Returns:
+            indices_to_compact: list of lists of tuples with the indices that
+                the generator needs to compress.
+        """
         assert masks_dict is not None
         batch_size = inp.size(0)
         if not mask_special_tokens:
@@ -342,6 +439,21 @@ class FixedOutChunker(nn.Module):
 
 
 class FreqChunker(nn.Module):
+    """Class for the chunker that implements 'frequency based chunking'. This
+    means that given an information budget: chunks are filled with embeddings
+    from tokens and add their self-information (log probability), such as the
+    less probable they are, the more informative they are thus the more
+    information budget they use.
+    Args:
+        alpha: parameter to ass when the token frequencies are approximated
+            using the Zipf law.
+        log_threshold: log probability threshold. It is a negative value, which
+            ranges typically from -4 to -60, where the more negative the more
+            compression.
+        device: `torch.device` to use, for cpu or cuda.
+        **kwargs: just as a safeguard if a generic network call to trigger
+                this class, which uses other keyword arguments.
+    """
     def __init__(self,
                  alpha=1.0,
                  log_threshold=None,
@@ -360,7 +472,23 @@ class FreqChunker(nn.Module):
                 mask_special_tokens=True,
                 token_ids=None,
                 **kwargs):
-
+        """Performs a forward pass of random chunking of a batch of tensors.
+        Args:
+            inp: `torch.tensor` of size (batch, max_length, embedding_dim)
+            masks_dict: dictionary of masks (torch.tensor of uint8) for the
+                output with keys `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+            mask_special_tokens: boolean which if True, leaves out of clustering
+                special tokens (<cls>, <sep>) in addition to padding ones.
+            token_ids: `torch.tensor` of size (batch, max_length) containing
+                the token_ids that will be used as their rank to approximate
+                their frequencies using the Zipf law.
+            **kwargs: just as a safeguard if a generic network call to trigger
+                this method, which uses other keyword arguments.
+        Returns:
+            indices_to_compact: list of lists of tuples with the indices that
+                the generator needs to compress.
+        """
         assert masks_dict is not None, "masks_dict is a required argument"
 
         batch_size = inp.size(0)
@@ -398,8 +526,8 @@ class FreqChunker(nn.Module):
 
 
 class IdentityChunker(nn.Module):
-    """
-    IdentityChunker docstring
+    """Placeholder chunker when it needs to be placed for consistency in different
+    configurations of the model, but its output is useless.
     """
     def __init__(self, *args, **kargs):
         super(IdentityChunker, self).__init__()
@@ -410,6 +538,9 @@ class IdentityChunker(nn.Module):
 
 
 def batch_remove_subsets(batch_L):
+    """Utility function for the deprecated NNSimilarity chunker that removes
+    chunks that are fully contained by others.
+    """
     batch_filtered = []
     for L in batch_L:
         filtered = filter(lambda f: not any(set(f) < set(g) for g in L), L)
