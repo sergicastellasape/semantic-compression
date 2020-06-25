@@ -11,6 +11,15 @@ from model.utils import hotfix_pack_padded_sequence
 
 
 class EmbeddingGenerator(nn.Module):
+    """Class to create all non-parametrized generators.
+    Args:
+        pool_function: non-parametrized pooling function, which accepts a
+            `torch.tensor` input, a dim keyword argument, and possible extra
+            keyword arguments, which may vary for different pooling functions.
+        device: `torch.device` to use, for cpu or cuda.
+    Returns:
+        Generator module.
+    """
     def __init__(self, pool_function=abs_max_pooling, device=torch.device("cpu")):
         super().__init__()
         try:
@@ -21,16 +30,56 @@ class EmbeddingGenerator(nn.Module):
         except Exception as error:
             raise ValueError("The pool_function seems to not work!")
 
-    def forward(self, input_tensors, indices, masks_dict=None, token_ids=None):
+    def forward(self, tensors_batch, indices, masks_dict=None, token_ids=None):
+        """Given a set of input tensors and indices to compact (from a chunking
+        module) returns new generated (i.e. compressed) embeddings. The core is
+        the generate() method, which could be itself the forward method acutally,
+        but we separated the implementation, in case future iterations implement
+        other procedures in the forward() pass.
+        Args:
+            tensors_batch: `torch.tensor` of size (batch, max_length, embedding_dim)
+            indices: list (batch length) of list (sequence length) of tuples
+            (indices to compact), coming from the chunking module.
+            masks_dict: dictionary of masks (torch.tensor of uint8) with keys
+                `padding_mask`, `seq_pair_mask` and `regular_tokens_mask`,
+                coming from the Transformer module.
+            token_ids: `torch.tensor` with token_ids of size (batch, max_length).
+        Returns:
+            compact_representations: compressed generated `torch.tensor`
+            compact_masks_dict: dictionary like masks_dict, but with masks for
+                the new compressed embeddings.
+            compression_rate: float of the average compression rate
+                (i.e. compressed number of regular embeddings over original
+                number of regular embeddings, not <cls>, <sep> or <pad>).
+        """
         assert masks_dict is not None
         compact_representation, compact_masks_dict, compression_rate = self.generate(
-            input_tensors, indices, masks_dict=masks_dict, token_ids=token_ids
+            tensors_batch, indices, masks_dict=masks_dict, token_ids=token_ids
         )
         return compact_representation, compact_masks_dict, compression_rate.item()
 
     def generate(
         self, tensors_batch, indices_batch, masks_dict=None, token_ids=None
     ):
+        """Core of the Generator Module. Given a set of input tensors and
+        indices to compact (from a chunking module) returns new generated
+        (i.e. compressed) embeddings.
+        Args:
+            tensors_batch: `torch.tensor` of size (batch, max_length, embedding_dim)
+            indices_batch: list (batch length) of list (sequence length) of tuples
+            (indices to compact), coming from the chunking module.
+            masks_dict: dictionary of masks (torch.tensor of uint8) with keys
+                `padding_mask`, `seq_pair_mask` and `regular_tokens_mask`,
+                coming from the Transformer module.
+            token_ids: `torch.tensor` with token_ids of size (batch, max_length).
+        Returns:
+            compact_representations: compressed generated `torch.tensor`
+            compact_masks_dict: dictionary like masks_dict, but with masks for
+                the new compressed embeddings.
+            compression_rate: float of the average compression rate
+                (i.e. compressed number of regular embeddings over original
+                number of regular embeddings, not <cls>, <sep> or <pad>).
+        """
         # tensors_batch.shape() = batch, seq_length, embedding_size
         # indices batch: list of lists of tuples
         # [[(0,), (1,), (2, 3, 4), (5,), (6,)], [(etc.)]]
@@ -52,7 +101,7 @@ class EmbeddingGenerator(nn.Module):
 
         for b, chunk_indices in enumerate(indices_batch):
             for i, idx_tuple in enumerate(chunk_indices):
-                # Apply pooling function for the group of tensors
+                # Apply pooling function for the group of tensors in idx_tuple
                 joint = self.pool_function(
                     tensors_batch[b, idx_tuple, :], dim=0,
                     token_ids=token_ids[b, idx_tuple])  # idx_tuple dimension
@@ -105,14 +154,46 @@ class EmbeddingGenerator(nn.Module):
 
 
 class ParamEmbeddingGenerator(nn.Module):
+    """Class to create all *parametrized* generators. It is equivalent and for
+    the most part equivalent to EmbeddingGenerator, but instead of a pooling function
+    a pooling network is passed.
+    Args:
+        embedding_dim: dimension of the embedding to initialize `gen_net`
+        gen_net: parametrized neural net that models many-to-one relationship.
+            It accepts a `torch.tensor` input, and the dimension being compressed
+            is always the dim=1 (i.e. the second one) and the tensor has size
+            (batch, len, embedding_dim). Batch will be typically 1 here, as we
+            loop for each element in the batch sequentially.
+        device: `torch.device` to use, for cpu or cuda.
+    Returns:
+        Generator module.
+    """
     def __init__(self, embedding_dim=768, gen_net=None, device=torch.device("cpu"), **kwargs):
         super().__init__()
-        assert gen_net is not None
+        assert gen_net is not None, "You must provide a valid Generator Network gen_net!"
 
         self.device = device
         self.gen_net = gen_net(embedding_dim=embedding_dim, device=device).to(device)
 
     def forward(self, tensors_batch, indices_batch, masks_dict=None, **kwargs):
+        """Given a set of input tensors and indices to compact (from a chunking
+        module) returns new generated (i.e. compressed) embeddings.
+        Args:
+            tensors_batch: `torch.tensor` of size (batch, max_length, embedding_dim)
+            indices: list (batch length) of list (sequence length) of tuples
+            (indices to compact), coming from the chunking module.
+            masks_dict: dictionary of masks (torch.tensor of uint8) with keys
+                `padding_mask`, `seq_pair_mask` and `regular_tokens_mask`,
+                coming from the Transformer module.
+            token_ids: `torch.tensor` with token_ids of size (batch, max_length).
+        Returns:
+            compact_representations: compressed generated `torch.tensor`
+            compact_masks_dict: dictionary like masks_dict, but with masks for
+                the new compressed embeddings.
+            compression_rate: float of the average compression rate
+                (i.e. compressed number of regular embeddings over original
+                number of regular embeddings, not <cls>, <sep> or <pad>).
+        """
         # tensors_batch.shape() = batch, seq_length, embedding_size
         # indices batch: list of lists of tuples
         # [[(0,), (1,), (2, 3, 4), (5,), (6,)], [(etc.)]]
@@ -182,6 +263,14 @@ class ParamEmbeddingGenerator(nn.Module):
 
 
 class ConvAtt(nn.Module):
+    """Parametrized generator function based on a 1D convolution + Attention
+    (1 head) and a final Linear layer.
+    Args:
+        embedding_dim: size of the embedding dimension. Typically 768 for Bert Base.
+        device: `torch.device` to use, for cpu or cuda.
+    Returns:
+        Module that does a transformation on the second dimension. (see forward())
+    """
     def __init__(self, embedding_dim, device=torch.device('cpu'), **kwargs):
         super().__init__()
 
@@ -201,6 +290,15 @@ class ConvAtt(nn.Module):
         )
 
     def forward(self, inp, mask=None, **kwargs):
+        """Perform forward pass of the generator net.
+        Args:
+            inp: `torch.tensor` of size (batch, length, embedding_dim)
+            mask: 1s and 0s mask of `torch.int8`, size (batch, length, 1).
+                Generally a mask won't be necessary because sequences are processed
+                sequentially so no padding is involved and everything is processed.
+        Returns:
+            output: generated `torch.tensor` of size (batch, 1, embedding_dim)
+        """
         if mask is None:
             mask = torch.ones_like(inp, dtype=torch.int8)
 
@@ -218,6 +316,14 @@ class ConvAtt(nn.Module):
 
 
 class LSTM(nn.Module):
+    """Parametrized generator function based on an LSTM, for which the second
+    dimension (dim=1) is the dimension of recurrence.
+    Args:
+        embedding_dim: size of the embedding dimension. Typically 768 for Bert Base.
+        device: `torch.device` to use, for cpu or cuda.
+    Returns:
+        Module that does a transformation on the second dimension. (see forward())
+    """
     def __init__(self, embedding_dim, hidden_dim=768, num_layers=1, dropout=0.0, device=torch.device('cpu'), **kwargs):
         super().__init__()
         self.device = device
@@ -247,6 +353,15 @@ class LSTM(nn.Module):
         )
 
     def forward(self, inp, mask=None, **kwargs):
+        """Perform forward pass of the generator net.
+        Args:
+            inp: `torch.tensor` of size (batch, length, embedding_dim)
+            mask: 1s and 0s mask of `torch.int8`, size (batch, length, 1).
+                Generally a mask won't be necessary because sequences are processed
+                sequentially so no padding is involved and everything is processed.
+        Returns:
+            output: generated `torch.tensor` of size (batch, 1, embedding_dim)
+        """
         if mask is None:
             mask = torch.ones((inp.size(0), inp.size(1)),
                               dtype=torch.int8,
@@ -266,9 +381,17 @@ class LSTM(nn.Module):
         unpacked_output = torch.nn.utils.rnn.pad_packed_sequence(
             lstm_out, batch_first=True
         )[0]
-        return unpacked_output.mean(dim=1)
+        # we return the mean over non-masked tokens, although we could do
+        # something fancier like getting the last hidden state.
+        return unpacked_output.sum(dim=1) / mask.sum(dim=1)
 
 class IdentityGenerator(nn.Module):
+    """This is just an identity Generator if we need to keep a generator
+    network for convenience but bypass it. For instance, it is used implicitly
+    when no generator argument is passed and still we want it to create the
+    end to end model; it is fully bypassed still then compression=False in the
+    end to end model forward pass.
+    """
     def __init__(self, device=torch.device('cpu'), *args, **kwargs):
         super(IdentityGenerator, self).__init__()
         self.device = device

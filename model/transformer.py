@@ -6,6 +6,20 @@ import torch.nn.functional as F
 
 
 class Transformer(nn.Module):
+    """This class is a wrapper that implements a Transformer model from the
+    @huggingface transformers library, but with convenient options of output and
+    arguments for this application.
+    Args:
+        model_class: model class object, i.e. `BertModel` from transformers.
+        tokenizer_class: tokenizer class object, i.e. `BertTokenizer`.
+        pre_trained_weights: name of the pretrained weights to load, or the path
+            to custom pretrained weights.
+        output_layer: layer from the transformer that we will use as features.
+        agg_layer: layer from the transformer that will be also kept for later
+            use as features for agglomerative chunking. If None is provided, it
+            defaults to the same as output_layer.
+        device: torch.device to use, cpu or cuda.
+    """
     def __init__(
         self,
         model_class=BertModel,
@@ -26,6 +40,25 @@ class Transformer(nn.Module):
         self.agg_layer = agg_layer if agg_layer is not None else output_layer
 
     def forward(self, batch_sequences, return_extras=False, max_length=256):
+        """Performs a forward pass of the Transformer encoder.
+        Args:
+            batch_sequences: list of strings or pairs of strings to encode.
+            return_extras: Flag which if set to `True`, returns not only the
+                Transformer output layer but also masks, input ids and agg_layer
+            max_length: length above which the tokenizer will truncate the input
+                It helps prevent memory errors.
+        Returns:
+            output: transformer output layer of size (batch, length, dim)
+            masks_dict: if return_extras=True, dictionary of masks (torch.tensor
+                of uint8) for the output with keys `padding_mask`,
+                `seq_pair_mask` and `regular_tokens_mask`.
+                See https://huggingface.co/transformers/ for more info.
+            batch_input_ids: returns a list of lists with integers which are the
+                input ids returned by the tokenizer. Useful for later Zipf law
+                calculation and estimating token.
+            agg_layer_output: transformer output for agg layer of
+                size (batch, length, dim)
+        """
         # return_extras: add returning the masks_dict and the token_ids
         batch_input_ids, masks_dict = self.batch_encode(batch_sequences, max_length=max_length)
         hidden_states_tup = self.model(
@@ -37,6 +70,18 @@ class Transformer(nn.Module):
             return hidden_states_tup[self.output_layer]
 
     def batch_encode(self, batch_sequences, max_length=256):
+        """Encodes a batch of sequences. At the time of developing, huggingface's
+        implementation of `batch_encode_plus` did not implement the pad_to_max_length
+        method, so this method implements it (although not extremely efficiently).
+        Args:
+            batch_sequences: list of strings or pairs of strings to encode.
+            max_length: length above which the tokenizer will truncate the input.
+        Returns:
+            input_tensor: `torch.tensor` to be passed to the transformer model.
+            masks_dict: dictionary with masks as `torch.tensor` of `dtype=uint8`,
+                keys from the dict being `padding_mask`, `seq_pair_mask` and
+                `regular_tokens_mask`.
+        """
         encoded_inputs_dict = self.tokenizer.batch_encode_plus(
             batch_text_or_text_pairs=batch_sequences,
             add_special_tokens=True,

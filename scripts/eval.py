@@ -57,23 +57,24 @@ logging.basicConfig(filename=os.path.join(LOGGING_PATH, f'{args.run_id}.txt'),
 
 logging.getLogger("transformers").setLevel(logging.WARNING)
 
-# load config file from datasets
+# Load config file from datasets
 with open(f"./config/{args.datasets_config}.yml", "r") as f:
-    config = yaml.load(f, Loader=yaml.Loader)
+    datasets_config = yaml.load(f, Loader=yaml.Loader)
 with open(f"./config/{args.model_config}.yml", "r") as f:
     model_config = yaml.load(f, Loader=yaml.Loader)
 
 
-# modify the datasets according to the arg passed
-if args.datasets is not None:
-    config["datasets"] = args.datasets
-else:
-    args.datasets = config["datasets"]
+# Modify the datasets according to the arg passed, if argument is empty
+if args.datasets is None:
+    args.datasets = datasets_config["datasets"]
 
-if args.eval_comp:
-    assert args.pooling is not None
-    assert args.chunker is not None
+# Raise error if compression is activated but no chunker or pooling is provided
+if args.train_comp or args.eval_comp:
+    assert args.pooling is not None, "You must pass a --pooling arg if compression is activated!"
+    assert args.chunker is not None, "You must pass a --chunker arg if compression is activated!"
 
+# Assign agg_layer as the output of the transformer if no specific agg_layer is
+# passed as an argument
 if args.agg_layer is None:
     args.agg_layer = args.trf_out_layer
 
@@ -82,13 +83,13 @@ if args.write_google_sheet:
 
 ################################################################################
 ################################ LOAD DATASETS #################################
-logging.info(f"Loading datasets: {config['datasets']}")
+logging.info(f"Loading datasets: {args.datasets}")
 dataframes = {}
-for dataset in config["datasets"]:
+for dataset in args.datasets:
     dataframes[dataset] = {}
     for kind in ["train", "test", "dev"]:
         dataframes[dataset][kind] = pd.read_csv(
-            config[dataset]["path"][kind], sep="\t")
+            datasets_config[dataset]["path"][kind], sep="\t")
 
 ################################################################################
 ################################# LOAD MODELS ##################################
@@ -99,7 +100,10 @@ logging.info(f"DEVICE: {device}")
 transformer_net = make_transformer(args, device=device)
 bracketing_net = make_bracketer(args, device=device)
 generator_net = make_generator(args, device=device)
-multitask_net = make_multitask_net(args, config, device=device)
+multitask_net = make_multitask_net(args,
+                                   datasets_config,
+                                   model_config,
+                                   device=device)
 model = End2EndModel(transformer=transformer_net,
                      bracketer=bracketing_net,
                      generator=generator_net,
@@ -112,15 +116,13 @@ logging.info(f"Transformer Layer used: {args.trf_out_layer}")
 
 ################################################################################
 ############################## DEFINE CONSTANTS ################################
-#torch.manual_seed(0)
+torch.manual_seed(0)
 
 # LOAD CONFIG DICTS AND CREATE NEW ONES FROM THOSE
-get_batch_function = {
-    dataset: config[dataset]["get_batch_fn"] for dataset in config["datasets"]
-}
-test_dataframes_dict = {
-    dataset: dataframes[dataset]["test"] for dataset in config["datasets"]
-}
+get_batch_function = {dataset: datasets_config[dataset]["get_batch_fn"]
+                      for dataset in args.datasets}
+test_dataframes_dict = {dataset: dataframes[dataset]["test"]
+                        for dataset in args.datasets}
 
 # Load checkpoint from modules in --load-modules argument
 model.load_modules(args.checkpoint_id,
@@ -146,5 +148,5 @@ if args.write_google_sheet:
     run_v = int(args.run_id[-1])
     write_google_sheet(metrics_dict,
                        row=row,
-                       name=config['google_sheet']['name'],
+                       name=datasets_config['google_sheet']['name'],
                        sheet_name=f'run{run_v}')

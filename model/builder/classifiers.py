@@ -11,14 +11,17 @@ from ..utils import abs_max_pooling
 
 
 def make_BiLSTMClassifier(num_classes=None, task=None, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert task is not None
     assert device is not None
     assert num_classes is not None
     return BiLSTMClassifier(768,
                             hidden_dim=768,
-                            sentset_size=num_classes,
+                            num_classes=num_classes,
                             num_layers=2,
-                            pooling="max_pooling",
+                            pooling="abs_max_pooling",
                             task=task,
                             bidirectional=True,
                             dropout=0.3,
@@ -26,6 +29,9 @@ def make_BiLSTMClassifier(num_classes=None, task=None, device=None):
 
 
 def make_AttentionClassifier(num_classes=None, task=None, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert task is not None
     assert device is not None
     assert num_classes is not None
@@ -39,6 +45,9 @@ def make_AttentionClassifier(num_classes=None, task=None, device=None):
 
 
 def make_SeqPairAttentionClassifier(num_classes=None, task=None, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert task is not None
     assert device is not None
     assert num_classes is not None
@@ -52,6 +61,9 @@ def make_SeqPairAttentionClassifier(num_classes=None, task=None, device=None):
 
 
 def make_SeqPairFancyClassifier(num_classes=None, task=None, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert task is not None
     assert device is not None
     assert num_classes is not None
@@ -64,6 +76,9 @@ def make_SeqPairFancyClassifier(num_classes=None, task=None, device=None):
 
 
 def make_DecAttClassifier(num_classes=None, task=None, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert task is not None
     assert device is not None
     assert num_classes is not None
@@ -76,6 +91,9 @@ def make_DecAttClassifier(num_classes=None, task=None, device=None):
                              device=device)
 
 def make_DecAttClassifier_v2(num_classes=None, task=None, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert task is not None
     assert device is not None
     assert num_classes is not None
@@ -90,6 +108,9 @@ def make_DecAttClassifier_v2(num_classes=None, task=None, device=None):
 
 
 def make_ConvAttClassifier(num_classes=None, task=None, device=None):
+    """Auxiliary funciton to initialize a part of the model, to minimize
+    boilerplate code and improve modularity.
+    """
     assert task is not None
     assert device is not None
     assert num_classes is not None
