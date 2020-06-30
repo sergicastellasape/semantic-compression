@@ -9,7 +9,7 @@ Welcome to the code for compressing semantic representations and evaluating them
 # 🏰 Model Architecture
 The high level architecture of the model is shown in the following figure. Its input can be either a batch of sequences or sequence pairs (List of strings or tuples of strings). The input can be mixed, containing both sequences and sequence pairs. The output of the full model will be the predictions for the tasks that are being performed in the form of log-logits. Also, a custom model can be built using only sub-parts like a Lego.
 
-![picture](https://user-images.githubusercontent.com/33417180/76959485-f7294f80-6919-11ea-9877-503cbd04b17f.png)
+![picture](https://user-images.githubusercontent.com/33417180/86136935-f2656180-baec-11ea-977b-0164fa000af9.png)
 
 # 📁 Code Architecture
 ## `config/`
@@ -41,8 +41,8 @@ This directory contains files with functions that build each part of the network
 
 ## `scripts/`
 Scripts to run training or evaluations.
-- `train.py`: train the model. It collects the command line arguments from `args_train.py`.
-- `eval.py`: evaluate the model on a test set. It collects the command line arguments from `args_eval.py`.
+- `train.py`: train the model. It collects the command line arguments from `args.py`.
+- `eval.py`: evaluate the model on a test set. It collects the command line arguments from `args.py`.
 
 # Examples
 Add examples of command line executions of the model.
