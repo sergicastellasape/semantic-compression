@@ -116,7 +116,7 @@ logging.info(f"Transformer Layer used: {args.trf_out_layer}")
 
 ################################################################################
 ############################## DEFINE CONSTANTS ################################
-torch.manual_seed(0)
+#torch.manual_seed(0)
 
 # Tensorboard initialization
 writer = SummaryWriter(log_dir=os.path.join(args.log_dir, args.run_id))
